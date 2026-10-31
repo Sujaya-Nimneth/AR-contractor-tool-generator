@@ -772,7 +772,7 @@ class PdfQuoteGenerator(
             bodyPaint(7.3f, MUTED_INK)
         )
         canvas.drawText(
-            "Prepared by Site Ledger",
+            "Prepared by ${context.workspace.project.contractorName.ifBlank { "the contractor" }}",
             margin + 14f,
             acceptanceTop + 110f,
             bodyPaint(7.2f, MUTED_INK)
@@ -782,13 +782,25 @@ class PdfQuoteGenerator(
     private fun drawDocumentHeader(context: PageContext) {
         val canvas = context.canvas
         val margin = MARGIN
+        val project = context.workspace.project
+        val contractorName = project.contractorName.ifBlank { "Independent contractor" }
+        val contractorDetails = listOf(project.contractorContact, project.contractorLicense)
+            .filter(String::isNotBlank)
+            .joinToString("  |  ")
+            .ifBlank { "AR CONTRACTOR ESTIMATE" }
+        val brandTextWidth = context.width - margin * 2f - 150f
         drawBrandMark(canvas, margin, 30f, 25f)
-        canvas.drawText("SITE LEDGER", margin + 34f, 42f, labelPaint(8.4f, INK))
         canvas.drawText(
-            "AR CONTRACTOR ESTIMATE",
+            fitText(contractorName, labelPaint(8.4f, INK), brandTextWidth),
+            margin + 34f,
+            42f,
+            labelPaint(8.4f, INK)
+        )
+        canvas.drawText(
+            fitText(contractorDetails, bodyPaint(6.4f, MUTED_INK), brandTextWidth),
             margin + 34f,
             54f,
-            labelPaint(6.4f, MUTED_INK)
+            bodyPaint(6.4f, MUTED_INK)
         )
         drawRightAlignedText(
             canvas,
