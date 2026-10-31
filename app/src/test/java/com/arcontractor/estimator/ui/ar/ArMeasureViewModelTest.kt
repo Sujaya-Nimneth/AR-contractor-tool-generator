@@ -85,6 +85,20 @@ class ArMeasureViewModelTest {
     }
 
     @Test
+    fun `duplicate consecutive vertex is rejected`() {
+        val viewModel = ArMeasureViewModel()
+        val firstPoint = point(0.0, 0.0, 0.0)
+        updateReticle(viewModel, firstPoint)
+        viewModel.onAction(ArMeasureAction.PlacePoint)
+        updateReticle(viewModel, firstPoint)
+
+        viewModel.onAction(ArMeasureAction.PlacePoint)
+
+        assertEquals(1, viewModel.uiState.value.outerVertices.size)
+        assertNotNull(viewModel.uiState.value.message)
+    }
+
+    @Test
     fun `undo removes vertex and redo restores it`() {
         val viewModel = ArMeasureViewModel()
         updateReticle(viewModel, point(0.0, 0.0, 0.0))

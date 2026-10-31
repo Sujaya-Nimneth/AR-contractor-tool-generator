@@ -109,9 +109,10 @@ class ArMeasureViewModel : ViewModel() {
 
     private fun placePoint() {
         val current = _uiState.value
-        val sample = current.reticleSample
+        val sample = current.reticleSample?.let { validateSample(it, current) }
         if (sample?.canPlaceVertex != true) {
-            _uiState.value = current.copy(message = placementBlockedMessage(current))
+            val blockedState = current.copy(reticleSample = sample)
+            _uiState.value = blockedState.copy(message = placementBlockedMessage(blockedState))
             return
         }
 
@@ -129,9 +130,17 @@ class ArMeasureViewModel : ViewModel() {
             }
 
             ArMeasurePhase.PLACING_OUTER_BOUNDARY -> {
+                if (isDuplicateOfLastVertex(current.outerVertices, sample.pose.position)) {
+                    _uiState.value = current.copy(
+                        reticleSample = sample,
+                        message = "Move the reticle to the next corner before placing another point."
+                    )
+                    return
+                }
                 pushUndo(current)
                 val vertices = current.outerVertices + sample.pose.position
                 _uiState.value = current.copy(
+                    reticleSample = sample,
                     outerVertices = vertices,
                     surfaceBasis = computeBasis(vertices, current.referencePose),
                     surfaceAnalysis = analyzePreview(vertices, current.cutouts, current.referencePose),
@@ -142,8 +151,16 @@ class ArMeasureViewModel : ViewModel() {
             }
 
             ArMeasurePhase.PLACING_CUTOUT -> {
+                if (isDuplicateOfLastVertex(current.activeCutoutVertices, sample.pose.position)) {
+                    _uiState.value = current.copy(
+                        reticleSample = sample,
+                        message = "Move the reticle to the next opening corner."
+                    )
+                    return
+                }
                 pushUndo(current)
                 _uiState.value = current.copy(
+                    reticleSample = sample,
                     activeCutoutVertices = current.activeCutoutVertices + sample.pose.position,
                     message = null,
                     canUndo = true,
@@ -380,24 +397,29 @@ class ArMeasureViewModel : ViewModel() {
         snapshot: MeasurementSnapshot,
         previous: ArMeasureUiState,
         message: String
-    ): ArMeasureUiState = ArMeasureUiState(
-        phase = snapshot.phase,
-        isTracking = previous.isTracking,
-        trackingFailureMessage = previous.trackingFailureMessage,
-        sessionErrorMessage = previous.sessionErrorMessage,
-        reticleSample = previous.reticleSample,
-        referencePose = snapshot.referencePose,
-        surfaceBasis = snapshot.surfaceBasis,
-        outerVertices = snapshot.outerVertices,
-        outerClosed = snapshot.outerClosed,
-        activeCutoutVertices = snapshot.activeCutoutVertices,
-        selectedCutoutKind = snapshot.selectedCutoutKind,
-        cutouts = snapshot.cutouts,
-        surfaceAnalysis = snapshot.surfaceAnalysis,
-        message = message,
-        canUndo = undoStack.isNotEmpty(),
-        canRedo = redoStack.isNotEmpty()
-    )
+    ): ArMeasureUiState {
+        val restored = ArMeasureUiState(
+            phase = snapshot.phase,
+            isTracking = previous.isTracking,
+            trackingFailureMessage = previous.trackingFailureMessage,
+            sessionErrorMessage = previous.sessionErrorMessage,
+            reticleSample = previous.reticleSample,
+            referencePose = snapshot.referencePose,
+            surfaceBasis = snapshot.surfaceBasis,
+            outerVertices = snapshot.outerVertices,
+            outerClosed = snapshot.outerClosed,
+            activeCutoutVertices = snapshot.activeCutoutVertices,
+            selectedCutoutKind = snapshot.selectedCutoutKind,
+            cutouts = snapshot.cutouts,
+            surfaceAnalysis = snapshot.surfaceAnalysis,
+            message = message,
+            canUndo = undoStack.isNotEmpty(),
+            canRedo = redoStack.isNotEmpty()
+        )
+        return restored.copy(
+            reticleSample = restored.reticleSample?.let { validateSample(it, restored) }
+        )
+    }
 
     private fun ArMeasureUiState.toSnapshot() = MeasurementSnapshot(
         phase = phase,
@@ -419,6 +441,11 @@ class ArMeasureViewModel : ViewModel() {
         CutoutKind.OTHER -> "Opening"
     }
 
+    private fun isDuplicateOfLastVertex(vertices: List<Vec3>, candidate: Vec3): Boolean =
+        vertices.lastOrNull()?.distanceTo(candidate)?.let {
+            it < MIN_VERTEX_SEPARATION_METERS
+        } ?: false
+
     private data class MeasurementSnapshot(
         val phase: ArMeasurePhase,
         val referencePose: Pose3D?,
@@ -433,5 +460,6 @@ class ArMeasureViewModel : ViewModel() {
 
     private companion object {
         const val MAX_HISTORY_DEPTH = 50
+        const val MIN_VERTEX_SEPARATION_METERS = 0.005
     }
 }
