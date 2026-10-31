@@ -2,6 +2,7 @@
 .gradle/
 build/
 **/build/
+**/bin/
 local.properties
 
 # Android Studio / IntelliJ IDEA
