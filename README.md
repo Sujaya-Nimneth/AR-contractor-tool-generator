@@ -1,0 +1,68 @@
+# AR Contractor Quote & Material Estimator
+
+An offline-first Android app for measuring contractor surfaces in AR, estimating materials and labor, and exporting branded client-ready quote PDFs.
+
+## Features
+
+- ARCore + SceneView surface capture with plane/depth hit testing, EMA pose smoothing, coplanarity checks, and undo/redo.
+- Pure Kotlin spatial geometry for best-fit planes, gravity-aligned 2D projection, cutout clipping, and polygon triangulation.
+- Trade-specific estimates for tiling, flooring, painting, and drywall, including package rounding, waste, consumables, labor, and tax.
+- Room-backed projects, surfaces, cutouts, editable contractor branding, and a seeded material catalog.
+- Responsive Jetpack Compose quote workspace with material, waste, labor, and tax controls.
+- Native A4 and US Letter vector PDF exports with contractor branding, hatched blueprints, dimension callouts, itemized pricing, terms, and a signature block.
+- Private PDF storage exposed to the Android share sheet through a read-only `FileProvider`.
+
+All geometry, persistence, estimation, and document generation run on-device. The app has no cloud data dependency.
+
+## Architecture
+
+| Module | Responsibility |
+| --- | --- |
+| `:core-domain` | Pure Kotlin JVM geometry, unit conversion, material estimation, and multi-surface aggregation |
+| `:app` | Android AR session, Filament rendering, Compose UI, Room persistence, repositories, and PDF generation |
+
+`MASTER_PLAN.md` is the source of truth for coordinate conventions, module boundaries, phase history, and verification criteria.
+
+## Requirements
+
+- macOS, Linux, or Windows with Android Studio
+- Android Studio bundled JDK 21
+- Android SDK 36 and an Android device/emulator running API 26 or newer
+- An ARCore-capable physical Android device for camera measurement
+
+The system JDK may be newer than the Android Gradle Plugin toolchain supports. Use Android Studio's bundled JBR explicitly:
+
+```bash
+export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
+```
+
+## Build And Test
+
+```bash
+# Domain tests, Android JVM tests, and app compilation
+./gradlew :core-domain:test :app:testDebugUnitTest :app:compileDebugKotlin
+
+# Compile device-side PDF/FileProvider tests
+./gradlew :app:compileDebugAndroidTestKotlin
+
+# Assemble and lint the debug app
+./gradlew :app:assembleDebug :app:lintDebug
+```
+
+The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
+
+With a connected Android device or emulator:
+
+```bash
+./gradlew :app:connectedDebugAndroidTest
+```
+
+The instrumentation suite generates real A4 and Letter PDFs with Android's `PdfDocument`, reopens them with `PdfRenderer`, and verifies the shareable `FileProvider` URI.
+
+## PDF Verification
+
+The native Canvas unit test renders every A4 and Letter page into `app/build/pdf-preview/` for visual inspection. These PNG previews are build artifacts and are not committed.
+
+## License
+
+This repository does not yet include a license file. Add one before distributing the application or source publicly.
