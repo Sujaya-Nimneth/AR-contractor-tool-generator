@@ -23,12 +23,17 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun materialCatalogDao(): MaterialCatalogDao
 
     companion object {
-        fun build(context: Context): AppDatabase =
-            Room.databaseBuilder(
-                context.applicationContext,
-                AppDatabase::class.java,
-                DATABASE_NAME
-            ).build()
+        @Volatile
+        private var instance: AppDatabase? = null
+
+        fun getInstance(context: Context): AppDatabase =
+            instance ?: synchronized(this) {
+                instance ?: build(context.applicationContext).also { instance = it }
+            }
+
+        private fun build(context: Context): AppDatabase =
+            Room.databaseBuilder(context, AppDatabase::class.java, DATABASE_NAME)
+                .build()
 
         private const val DATABASE_NAME = "ar-contractor.db"
     }

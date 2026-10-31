@@ -24,6 +24,22 @@ interface ProjectDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(project: ProjectEntity)
 
+    @Query(
+        """
+        UPDATE projects
+        SET taxRate = :taxRate,
+            taxPolicy = :taxPolicy,
+            updatedAtEpochMillis = :updatedAtEpochMillis
+        WHERE id = :projectId
+        """
+    )
+    suspend fun updateTaxSettings(
+        projectId: String,
+        taxRate: Double,
+        taxPolicy: String,
+        updatedAtEpochMillis: Long
+    )
+
     @Query("DELETE FROM projects WHERE id = :projectId")
     suspend fun delete(projectId: String)
 }
