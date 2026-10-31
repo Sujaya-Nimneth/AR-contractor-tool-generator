@@ -33,6 +33,9 @@ data class SurfaceQuoteLine(
     val referenceNormal: Vec3?,
     val cutouts: List<CutoutPolygonInput>,
     val effectiveMaterial: MaterialSpec,
+    val wastePresetOverride: String?,
+    val customWasteFactorOverride: Double?,
+    val laborRateOverride: Double?,
     val analysis: AnalyzedSurfacePolygon?,
     val estimate: SurfaceEstimate?,
     val loadError: String? = null

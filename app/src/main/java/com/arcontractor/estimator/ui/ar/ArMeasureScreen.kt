@@ -32,6 +32,7 @@ import com.arcontractor.estimator.spatial.tracking.ArSessionController
 import com.arcontractor.estimator.spatial.tracking.PolygonSceneRenderer
 import com.arcontractor.estimator.spatial.tracking.ReticleHitTester
 import com.arcontractor.estimator.spatial.tracking.SurfaceRenderSnapshot
+import com.arcontractor.estimator.ui.quote.MeasurementCapture
 import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
 import io.github.sceneview.ar.ARScene
@@ -49,7 +50,9 @@ import kotlinx.coroutines.delay
  */
 @Composable
 fun ArMeasureScreen(
-    viewModel: ArMeasureViewModel = viewModel()
+    viewModel: ArMeasureViewModel = viewModel(),
+    onSaveMeasurement: (MeasurementCapture) -> Unit = {},
+    onBackToQuote: () -> Unit = {}
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val engine = rememberEngine()
@@ -187,7 +190,10 @@ fun ArMeasureScreen(
         )
 
         Column(modifier = Modifier.align(Alignment.TopCenter)) {
-            MeasurementTopHud(state)
+            MeasurementTopHud(
+                state = state,
+                onBackToQuote = onBackToQuote
+            )
             AnimatedVisibility(
                 visible = !state.isTracking,
                 enter = fadeIn(),
@@ -225,7 +231,16 @@ fun ArMeasureScreen(
             )
             MeasurementBottomHud(
                 state = state,
-                onAction = viewModel::onAction
+                onAction = viewModel::onAction,
+                onSaveMeasurement = {
+                    onSaveMeasurement(
+                        MeasurementCapture(
+                            outerVertices = state.outerVertices,
+                            referenceNormal = state.referencePose?.normal,
+                            cutouts = state.cutouts
+                        )
+                    )
+                }
             )
         }
     }

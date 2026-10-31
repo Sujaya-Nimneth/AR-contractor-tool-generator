@@ -30,6 +30,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.automirrored.rounded.Redo
 import androidx.compose.material.icons.automirrored.rounded.Undo
 import androidx.compose.material.icons.rounded.Close
@@ -70,7 +71,10 @@ private val HudInk = Color(0xE612161B)
 private val HudLine = Color(0x33FFFFFF)
 
 @Composable
-internal fun MeasurementTopHud(state: ArMeasureUiState) {
+internal fun MeasurementTopHud(
+    state: ArMeasureUiState,
+    onBackToQuote: () -> Unit
+) {
     Column(
         modifier = Modifier
             .fillMaxWidth()
@@ -106,7 +110,28 @@ internal fun MeasurementTopHud(state: ArMeasureUiState) {
                     fontWeight = FontWeight.SemiBold
                 )
             }
-            TrackingBadge(state)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                TrackingBadge(state)
+                Spacer(Modifier.width(6.dp))
+                IconButton(
+                    onClick = onBackToQuote,
+                    modifier = Modifier
+                        .size(38.dp)
+                        .clip(RoundedCornerShape(10.dp))
+                        .background(Color.Black.copy(alpha = 0.48f))
+                        .border(
+                            1.dp,
+                            Color.White.copy(alpha = 0.18f),
+                            RoundedCornerShape(10.dp)
+                        )
+                ) {
+                    Icon(
+                        imageVector = Icons.AutoMirrored.Rounded.ArrowBack,
+                        contentDescription = "Back to quote",
+                        tint = Color.White
+                    )
+                }
+            }
         }
 
         Spacer(Modifier.height(14.dp))
@@ -228,7 +253,8 @@ internal fun CenterReticle(state: ArMeasureUiState) {
 @Composable
 internal fun MeasurementBottomHud(
     state: ArMeasureUiState,
-    onAction: (ArMeasureAction) -> Unit
+    onAction: (ArMeasureAction) -> Unit,
+    onSaveMeasurement: () -> Unit
 ) {
     Column(
         modifier = Modifier
@@ -304,7 +330,7 @@ internal fun MeasurementBottomHud(
                 Button(
                     onClick = {
                         if (state.phase == ArMeasurePhase.COMPLETED) {
-                            onAction(ArMeasureAction.Reset)
+                            onSaveMeasurement()
                         } else {
                             onAction(ArMeasureAction.PlacePoint)
                         }
@@ -655,7 +681,14 @@ private fun ArMeasureUiState.secondaryActions(): List<SecondaryAction> = buildLi
 
         ArMeasurePhase.SCANNING,
         ArMeasurePhase.LOCKING_PLANE,
-        ArMeasurePhase.COMPLETED -> Unit
+        ArMeasurePhase.COMPLETED -> {
+            add(
+                SecondaryAction(
+                    label = "START NEW MEASUREMENT",
+                    action = ArMeasureAction.Reset
+                )
+            )
+        }
     }
 }
 
@@ -670,7 +703,7 @@ private fun ArMeasureUiState.primaryActionLabel(): String = when (phase) {
     ArMeasurePhase.LOCKING_PLANE -> "LOCK SURFACE"
     ArMeasurePhase.PLACING_OUTER_BOUNDARY -> "PLACE CORNER"
     ArMeasurePhase.PLACING_CUTOUT -> "PLACE OPENING CORNER"
-    ArMeasurePhase.COMPLETED -> "NEW MEASUREMENT"
+    ArMeasurePhase.COMPLETED -> "SAVE TO QUOTE"
 }
 
 private fun ArMeasureUiState.reticleLabel(): String = when {

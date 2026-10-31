@@ -67,15 +67,21 @@ class RoomProjectRepository(
             val materials = materialEntities.map { it.toDomain() }
             val materialsById = materials.associateBy(MaterialSpec::id)
             val loadErrors = ArrayList<String>()
-            val surfaces = storedSurfaces.map { stored ->
-                reconstructSurface(stored, materialsById, loadErrors)
-            }
             val taxRate = project.taxRate.coerceIn(0.0, 1.0)
             val taxPolicy = runCatching { TaxPolicy.valueOf(project.taxPolicy) }
                 .getOrElse {
                     loadErrors += "Unknown tax policy '${project.taxPolicy}'; totals use taxable labor."
                     TaxPolicy.TAX_TOTAL_SUBTOTAL
                 }
+            val surfaces = storedSurfaces.map { stored ->
+                reconstructSurface(
+                    stored = stored,
+                    materialsById = materialsById,
+                    loadErrors = loadErrors,
+                    taxRate = taxRate,
+                    taxPolicy = taxPolicy
+                )
+            }
             val quoteInputs = surfaces.mapNotNull { surface ->
                 val analysis = surface.analysis ?: return@mapNotNull null
                 val estimate = surface.estimate ?: return@mapNotNull null
@@ -221,7 +227,9 @@ class RoomProjectRepository(
     private fun reconstructSurface(
         stored: SurfaceWithCutouts,
         materialsById: Map<String, MaterialSpec>,
-        loadErrors: MutableList<String>
+        loadErrors: MutableList<String>,
+        taxRate: Double,
+        taxPolicy: TaxPolicy
     ): SurfaceQuoteLine {
         val entity = stored.surface
         val catalogMaterial = materialsById[entity.materialId] ?: run {
@@ -254,10 +262,15 @@ class RoomProjectRepository(
                 referenceNormal = entity.referenceNormal,
                 cutouts = cutouts,
                 effectiveMaterial = effectiveMaterial,
+                wastePresetOverride = entity.wastePresetOverride,
+                customWasteFactorOverride = entity.customWasteFactorOverride,
+                laborRateOverride = entity.laborRateOverride,
                 analysis = analysis,
                 estimate = MaterialEstimationEngine.estimateSurface(
                     geometry = analysis,
-                    materialSpec = effectiveMaterial
+                    materialSpec = effectiveMaterial,
+                    taxRate = taxRate,
+                    taxPolicy = taxPolicy
                 )
             )
         }.getOrElse { error ->
@@ -272,6 +285,9 @@ class RoomProjectRepository(
                 referenceNormal = entity.referenceNormal,
                 cutouts = cutouts,
                 effectiveMaterial = effectiveMaterial,
+                wastePresetOverride = entity.wastePresetOverride,
+                customWasteFactorOverride = entity.customWasteFactorOverride,
+                laborRateOverride = entity.laborRateOverride,
                 analysis = null,
                 estimate = null,
                 loadError = message
@@ -302,6 +318,9 @@ class RoomProjectRepository(
             referenceNormal = entity.referenceNormal,
             cutouts = emptyList(),
             effectiveMaterial = fallback,
+            wastePresetOverride = entity.wastePresetOverride,
+            customWasteFactorOverride = entity.customWasteFactorOverride,
+            laborRateOverride = entity.laborRateOverride,
             analysis = null,
             estimate = null,
             loadError = error

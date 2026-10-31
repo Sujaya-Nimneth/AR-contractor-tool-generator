@@ -1,0 +1,162 @@
+package com.arcontractor.estimator.ui.quote
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.graphics.PathEffect
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import java.math.BigDecimal
+import java.text.NumberFormat
+import java.util.Locale
+
+private val currencyFormatter = NumberFormat.getCurrencyInstance(Locale.US)
+
+fun formatMoney(value: BigDecimal): String = currencyFormatter.format(value)
+
+fun formatArea(squareMeters: Double): String =
+    String.format(Locale.US, "%.2f m²", squareMeters)
+
+fun formatAreaCompact(squareMeters: Double): String =
+    String.format(Locale.US, "%.1f m²", squareMeters)
+
+fun formatPercent(fraction: Double): String =
+    String.format(Locale.US, "%.1f%%", fraction * 100.0)
+
+fun formatRate(rate: Double, unit: String): String =
+    String.format(Locale.US, "$%.2f / %s", rate, unit)
+
+val numericTextStyle: TextStyle
+    @Composable get() = MaterialTheme.typography.bodyMedium.copy(
+        fontFamily = FontFamily.Monospace,
+        fontFeatureSettings = "tnum"
+    )
+
+@Composable
+fun SectionHeader(
+    title: String,
+    detail: String,
+    modifier: Modifier = Modifier,
+    action: (@Composable () -> Unit)? = null
+) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        verticalAlignment = Alignment.Bottom
+    ) {
+        Column(modifier = Modifier.weight(1f)) {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleLarge,
+                color = MaterialTheme.colorScheme.onBackground
+            )
+            Text(
+                text = detail,
+                modifier = Modifier.padding(top = 3.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
+        action?.invoke()
+    }
+}
+
+@Composable
+fun EmptyLedgerPanel(
+    title: String,
+    body: String,
+    modifier: Modifier = Modifier,
+    action: (@Composable () -> Unit)? = null
+) {
+    val borderColor = MaterialTheme.colorScheme.outline
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                color = MaterialTheme.colorScheme.surface.copy(alpha = 0.54f),
+                shape = RoundedCornerShape(8.dp)
+            )
+            .padding(18.dp)
+    ) {
+        androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
+            drawRoundRect(
+                color = borderColor,
+                cornerRadius = CornerRadius(8.dp.toPx()),
+                style = Stroke(
+                    width = 1.dp.toPx(),
+                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 5.dp.toPx()))
+                )
+            )
+        }
+        Column {
+            Text(
+                text = title,
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.onSurface
+            )
+            Text(
+                text = body,
+                modifier = Modifier.padding(top = 5.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (action != null) {
+                Box(modifier = Modifier.padding(top = 12.dp)) {
+                    action()
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun LedgerValueRow(
+    label: String,
+    value: String,
+    modifier: Modifier = Modifier,
+    emphasized: Boolean = false
+) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(vertical = if (emphasized) 10.dp else 6.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = label,
+            modifier = Modifier.weight(1f),
+            style = if (emphasized) {
+                MaterialTheme.typography.titleMedium
+            } else {
+                MaterialTheme.typography.bodyMedium
+            },
+            color = if (emphasized) {
+                MaterialTheme.colorScheme.onSurface
+            } else {
+                MaterialTheme.colorScheme.onSurfaceVariant
+            }
+        )
+        Text(
+            text = value,
+            style = numericTextStyle.copy(
+                fontWeight = if (emphasized) FontWeight.SemiBold else FontWeight.Normal,
+                fontSize = if (emphasized) MaterialTheme.typography.titleMedium.fontSize else
+                    MaterialTheme.typography.bodyMedium.fontSize
+            ),
+            color = MaterialTheme.colorScheme.onSurface
+        )
+    }
+}

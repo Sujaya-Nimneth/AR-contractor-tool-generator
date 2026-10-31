@@ -27,6 +27,7 @@ class RoomMaterialCatalogRepository(
         materialDao.observeAll().map { entities -> entities.map { it.toDomain() } }
 
     override suspend fun ensureSeeded() {
+        if (materialDao.count() > 0) return
         val timestamp = now()
         materialDao.insertMissing(
             DefaultMaterialCatalog.allPresets().map { material -> material.toEntity(timestamp) }
