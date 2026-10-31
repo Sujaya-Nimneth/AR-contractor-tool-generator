@@ -120,6 +120,11 @@ class RepositoryTest {
         assertTrue(updated.quote.materialSubtotal > originalMaterialTotal)
         assertEquals(0.10, updated.quote.taxRate, 0.0)
         assertEquals(TaxPolicy.TAX_MATERIALS_AND_CONSUMABLES_ONLY, updated.quote.taxPolicy)
+        assertEquals(0.10, updated.surfaces.single().estimate?.taxRate ?: -1.0, 0.0)
+        assertEquals(
+            TaxPolicy.TAX_MATERIALS_AND_CONSUMABLES_ONLY,
+            updated.surfaces.single().estimate?.taxPolicy
+        )
         val expectedTaxable = updated.quote.materialSubtotal
             .add(updated.quote.consumablesSubtotal)
             .multiply(BigDecimal.valueOf(0.10))
