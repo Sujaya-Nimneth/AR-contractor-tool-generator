@@ -1,0 +1,16 @@
+# Gradle & Build Outputs
+.gradle/
+build/
+**/build/
+local.properties
+
+# Android Studio / IntelliJ IDEA
+.idea/
+*.iml
+.navigation/
+captures/
+*.apk
+*.aab
+
+# macOS
+.DS_Store
