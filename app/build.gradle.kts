@@ -49,6 +49,10 @@ kotlin {
     }
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     // Pure Kotlin Spatial Geometry & Material Estimation Core
     implementation(project(":core-domain"))
