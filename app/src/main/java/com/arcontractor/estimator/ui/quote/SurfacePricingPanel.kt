@@ -29,6 +29,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -59,11 +60,11 @@ fun SurfacePricingPanel(
     val wasteFactor = surface.customWasteFactorOverride
         ?: surface.effectiveMaterial.effectiveWasteFactor
     var wasteSliderValue by remember(surface.surfaceId, wasteFactor) {
-        mutableStateOf(wasteFactor.toFloat())
+        mutableFloatStateOf(wasteFactor.toFloat())
     }
     val laborRate = surface.effectiveMaterial.laborRatePerUnitArea
     var laborSliderValue by remember(surface.surfaceId, laborRate) {
-        mutableStateOf(laborRate.toFloat())
+        mutableFloatStateOf(laborRate.toFloat())
     }
 
     Surface(

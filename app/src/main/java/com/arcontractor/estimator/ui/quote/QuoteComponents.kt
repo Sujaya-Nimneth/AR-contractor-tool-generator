@@ -1,7 +1,6 @@
 package com.arcontractor.estimator.ui.quote
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -13,6 +12,7 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.drawscope.Stroke
@@ -89,18 +89,20 @@ fun EmptyLedgerPanel(
                 color = MaterialTheme.colorScheme.surface.copy(alpha = 0.54f),
                 shape = RoundedCornerShape(8.dp)
             )
+            .drawBehind {
+                drawRoundRect(
+                    color = borderColor,
+                    cornerRadius = CornerRadius(8.dp.toPx()),
+                    style = Stroke(
+                        width = 1.dp.toPx(),
+                        pathEffect = PathEffect.dashPathEffect(
+                            floatArrayOf(7.dp.toPx(), 5.dp.toPx())
+                        )
+                    )
+                )
+            }
             .padding(18.dp)
     ) {
-        androidx.compose.foundation.Canvas(modifier = Modifier.matchParentSize()) {
-            drawRoundRect(
-                color = borderColor,
-                cornerRadius = CornerRadius(8.dp.toPx()),
-                style = Stroke(
-                    width = 1.dp.toPx(),
-                    pathEffect = PathEffect.dashPathEffect(floatArrayOf(7.dp.toPx(), 5.dp.toPx()))
-                )
-            )
-        }
         Column {
             Text(
                 text = title,
