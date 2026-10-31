@@ -1,6 +1,6 @@
 # AR Contractor Quote & Material Estimation App — Master Engineering Plan
 
-> **Architecture Status:** **Phase 1 Complete & Verified** (`:core-domain:test` 23/23 passing + `:app:compileDebugKotlin` green) — **Awaiting Review for Phase 2**  
+> **Architecture Status:** **Phase 2 Complete & Verified** (`:core-domain:test` 23/23 + `:app:testDebugUnitTest` 11/11 + `:app:compileDebugKotlin` and debug APK green) — **Awaiting Review for Phase 3**
 > **Target Platform:** Native Android (Min SDK 26 / Target SDK 35 / Compile SDK 36, Kotlin 2.2.0, Jetpack Compose Material 3)  
 > **Offline Guarantee:** 100% On-Device Spatial Math, Room Persistence, and Vector `PdfDocument` Generation (Zero Cloud Dependencies)
 
@@ -123,11 +123,11 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
   - [x] `ProjectQuoteAggregator` (multi-surface quote roll-up)
 - [x] Comprehensive JVM JUnit test suites (`:core-domain:test`) covering tilted planes, concave L-shaped rooms, wall door/window cutouts, overlapping cutouts, jitter smoothing, coplanarity rejection, and all 4 trades' estimation math
 
-### Phase 2: ARCore + SceneView Spatial Pipeline & Compose HUD *(Pending Phase 1 Review)*
-- [ ] `spatial.tracking.ArSessionController`: ARCore configuration (`Config.DepthMode.AUTOMATIC`, `PlaneFindingMode.HORIZONTAL_AND_VERTICAL`, `InstantPlacementMode.DISABLED` for metric accuracy)
-- [ ] `spatial.tracking.ReticleHitTester`: Continuous center-screen `Frame.hitTest` prioritizing `Plane` (within polygon) > `DepthPoint`, piped through `EmaPoseFilter` and `CoplanarityValidator`
-- [ ] `spatial.tracking.PolygonSceneRenderer`: Filament/SceneView 3D vertex sphere nodes, dynamic cylinder/line edge extrusions, translucent triangulated surface fill, and red cutout wireframes
-- [ ] `ui.ar.ArMeasureViewModel` & `ArMeasureScreen`: Unidirectional MVI state machine (`Scanning` → `LockingPlane` → `PlacingOuterBoundary` → `PlacingCutout` → `Completed`), live dimension pills, flatness badge, Undo/Redo/Close Polygon controls
+### Phase 2: ARCore + SceneView Spatial Pipeline & Compose HUD *(Complete & Verified)*
+- [x] `spatial.tracking.ArSessionController`: ARCore configuration (`Config.DepthMode.AUTOMATIC`, `PlaneFindingMode.HORIZONTAL_AND_VERTICAL`, `InstantPlacementMode.DISABLED` for metric accuracy)
+- [x] `spatial.tracking.ReticleHitTester`: Continuous center-screen `Frame.hitTest` prioritizing `Plane` (within polygon) > `DepthPoint`, piped through `EmaPoseFilter` and `CoplanarityValidator`
+- [x] `spatial.tracking.PolygonSceneRenderer`: Filament/SceneView 3D vertex sphere nodes, dynamic cylinder/line edge extrusions, translucent triangulated surface fill, and red cutout wireframes
+- [x] `ui.ar.ArMeasureViewModel` & `ArMeasureScreen`: Unidirectional MVI state machine (`Scanning` → `LockingPlane` → `PlacingOuterBoundary` → `PlacingCutout` → `Completed`), live dimension pills, flatness badge, Undo/Redo/Close Polygon controls
 
 ### Phase 3: Room Persistence, Material Catalog & Quote Summary UI *(Pending Phase 2 Review)*
 - [ ] `data.local`: Room database (`AppDatabase`), entities (`ProjectEntity`, `SurfaceEntity`, `CutoutEntity`, `MaterialSpecEntity`), JSON/blob vertex type converters, DAOs, and pre-seeded contractor material catalog
