@@ -28,6 +28,10 @@ class PolygonSceneRenderer(
     private val engine: Engine,
     materialLoader: MaterialLoader
 ) {
+    private var lastStructuralSnapshot: SurfaceRenderSnapshot? = null
+    private var lastTargetNodes: MutableList<Node>? = null
+    private var previewNode: CylinderNode? = null
+
     private val outerVertexMaterial = materialLoader.createColorInstance(
         color = 0xFF23D5AB.toInt(),
         metallic = 0.0f,
@@ -69,17 +73,32 @@ class PolygonSceneRenderer(
         snapshot: SurfaceRenderSnapshot,
         targetNodes: MutableList<Node>
     ): Boolean {
+        val structuralSnapshot = snapshot.copy(previewPoint = null)
+        if (structuralSnapshot != lastStructuralSnapshot || targetNodes !== lastTargetNodes) {
+            val rebuilt = rebuildStructuralNodes(structuralSnapshot, targetNodes)
+            if (!rebuilt) return false
+            lastStructuralSnapshot = structuralSnapshot
+            lastTargetNodes = targetNodes
+        }
+        updatePreview(snapshot, targetNodes)
+        return true
+    }
+
+    private fun rebuildStructuralNodes(
+        snapshot: SurfaceRenderSnapshot,
+        targetNodes: MutableList<Node>
+    ): Boolean {
         val replacement = ArrayList<Node>()
         return try {
             buildSurfaceFill(snapshot.surfaceAnalysis)?.let(replacement::add)
             addOuterGeometry(snapshot, replacement)
             addCompletedCutoutWireframes(snapshot.surfaceAnalysis, replacement)
             addActiveCutoutGeometry(snapshot.activeCutoutVertices, replacement)
-            addPreviewGeometry(snapshot, replacement)
 
             val previous = targetNodes.toList()
             targetNodes.clear()
             targetNodes.addAll(replacement)
+            previewNode = null
             previous.forEach { node -> runCatching { node.destroy() } }
             true
         } catch (_: RuntimeException) {
@@ -92,6 +111,9 @@ class PolygonSceneRenderer(
         val previous = targetNodes.toList()
         targetNodes.clear()
         previous.forEach { node -> runCatching { node.destroy() } }
+        previewNode = null
+        lastStructuralSnapshot = null
+        lastTargetNodes = null
     }
 
     private fun addOuterGeometry(
@@ -161,22 +183,41 @@ class PolygonSceneRenderer(
         }
     }
 
-    private fun addPreviewGeometry(
+    private fun updatePreview(
         snapshot: SurfaceRenderSnapshot,
-        nodes: MutableList<Node>
+        targetNodes: MutableList<Node>
     ) {
-        val preview = snapshot.previewPoint ?: return
+        val preview = snapshot.previewPoint
         val anchor = snapshot.activeCutoutVertices.lastOrNull()
             ?: snapshot.outerVertices.lastOrNull()
-            ?: return
-        nodes.add(
-            createEdgeNode(
+        if (preview == null || anchor == null || preview.distanceTo(anchor) < MIN_EDGE_LENGTH_METERS) {
+            previewNode?.let { node ->
+                targetNodes.remove(node)
+                runCatching { node.destroy() }
+            }
+            previewNode = null
+            return
+        }
+
+        val existing = previewNode
+        if (existing == null) {
+            previewNode = createEdgeNode(
                 start = anchor,
                 end = preview,
                 radiusMeters = PREVIEW_RADIUS_METERS,
                 material = previewMaterial
+            ).also(targetNodes::add)
+        } else {
+            val direction = preview - anchor
+            existing.updateGeometry(
+                radius = PREVIEW_RADIUS_METERS,
+                height = direction.length().toFloat().coerceAtLeast(MIN_EDGE_LENGTH_METERS),
+                center = Float3(0.0f, 0.0f, 0.0f),
+                sideCount = 12
             )
-        )
+            existing.position = anchor.lerp(preview, 0.5).toFloat3()
+            existing.quaternion = rotationFromYAxis(direction)
+        }
     }
 
     private fun buildSurfaceFill(analysis: AnalyzedSurfacePolygon?): Node? {

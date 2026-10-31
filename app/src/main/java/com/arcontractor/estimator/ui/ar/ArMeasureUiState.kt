@@ -123,6 +123,7 @@ sealed interface ArMeasureAction {
     ) : ArMeasureAction
 
     data class SessionFailed(val message: String) : ArMeasureAction
+    data class RenderFailed(val message: String) : ArMeasureAction
     data class SelectCutoutKind(val kind: CutoutKind) : ArMeasureAction
 
     data object PlacePoint : ArMeasureAction

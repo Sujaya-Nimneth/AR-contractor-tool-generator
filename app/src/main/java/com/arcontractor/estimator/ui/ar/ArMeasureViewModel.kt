@@ -44,6 +44,9 @@ class ArMeasureViewModel : ViewModel() {
             is ArMeasureAction.ReticleUpdated -> updateReticle(action.sample)
             is ArMeasureAction.TrackingChanged -> updateTracking(action)
             is ArMeasureAction.SessionFailed -> showSessionError(action.message)
+            is ArMeasureAction.RenderFailed -> _uiState.value =
+                _uiState.value.copy(message = action.message)
+
             is ArMeasureAction.SelectCutoutKind -> selectCutoutKind(action.kind)
             ArMeasureAction.PlacePoint -> placePoint()
             ArMeasureAction.CloseOuterPolygon -> closeOuterPolygon()

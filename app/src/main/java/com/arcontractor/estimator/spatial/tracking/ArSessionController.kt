@@ -13,13 +13,23 @@ import com.google.ar.core.Session
 class ArSessionController {
 
     /**
-     * Mutates and commits the SceneView-provided config so unrelated SceneView settings are kept.
+     * Mutates the SceneView-provided config so unrelated SceneView settings are kept.
+     *
+     * SceneView invokes this inside its own `Session.configure` block. Do not call
+     * `Session.configure` from here or the ARSession wrapper will re-enter its callback.
      */
-    fun configure(session: Session, config: Config) {
+    fun applyTo(config: Config) {
         config.depthMode = Config.DepthMode.AUTOMATIC
         config.planeFindingMode = Config.PlaneFindingMode.HORIZONTAL_AND_VERTICAL
         config.instantPlacementMode = Config.InstantPlacementMode.DISABLED
         config.focusMode = Config.FocusMode.AUTO
+    }
+
+    /**
+     * Applies and commits the measurement config for callers that own the session lifecycle.
+     */
+    fun configure(session: Session, config: Config) {
+        applyTo(config)
         session.configure(config)
     }
 }
