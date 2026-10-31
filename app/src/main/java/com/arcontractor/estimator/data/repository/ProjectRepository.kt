@@ -44,6 +44,12 @@ interface ProjectRepository {
         taxPolicy: TaxPolicy
     )
 
+    suspend fun updateProjectMetadata(
+        projectId: String,
+        name: String,
+        clientName: String
+    )
+
     suspend fun renameSurface(surfaceId: String, name: String)
     suspend fun deleteSurface(surfaceId: String)
 }
@@ -211,6 +217,20 @@ class RoomProjectRepository(
             projectId = projectId,
             taxRate = taxRate,
             taxPolicy = taxPolicy.name,
+            updatedAtEpochMillis = now()
+        )
+    }
+
+    override suspend fun updateProjectMetadata(
+        projectId: String,
+        name: String,
+        clientName: String
+    ) {
+        require(name.isNotBlank()) { "Project name cannot be blank." }
+        projectDao.updateMetadata(
+            projectId = projectId,
+            name = name.trim(),
+            clientName = clientName.trim(),
             updatedAtEpochMillis = now()
         )
     }

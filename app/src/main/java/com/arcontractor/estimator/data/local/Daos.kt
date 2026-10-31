@@ -27,6 +27,22 @@ interface ProjectDao {
     @Query(
         """
         UPDATE projects
+        SET name = :name,
+            clientName = :clientName,
+            updatedAtEpochMillis = :updatedAtEpochMillis
+        WHERE id = :projectId
+        """
+    )
+    suspend fun updateMetadata(
+        projectId: String,
+        name: String,
+        clientName: String,
+        updatedAtEpochMillis: Long
+    )
+
+    @Query(
+        """
+        UPDATE projects
         SET taxRate = :taxRate,
             taxPolicy = :taxPolicy,
             updatedAtEpochMillis = :updatedAtEpochMillis

@@ -166,6 +166,24 @@ class RepositoryTest {
         )
     }
 
+    @Test
+    fun `project metadata is trimmed and persisted for quote export`() = runTest {
+        val fixtures = RepositoryFixtures()
+        val projectId = fixtures.projectRepository.ensureDefaultProject()
+
+        fixtures.projectRepository.updateProjectMetadata(
+            projectId = projectId,
+            name = "  Harbor Street renovation  ",
+            clientName = "  Morgan & Lee  "
+        )
+
+        val workspace = fixtures.projectRepository.observeWorkspace(projectId)
+            .filterNotNull()
+            .first()
+        assertEquals("Harbor Street renovation", workspace.project.name)
+        assertEquals("Morgan & Lee", workspace.project.clientName)
+    }
+
     private class RepositoryFixtures {
         val projectDao = FakeProjectDao()
         val surfaceDao = FakeSurfaceDao()

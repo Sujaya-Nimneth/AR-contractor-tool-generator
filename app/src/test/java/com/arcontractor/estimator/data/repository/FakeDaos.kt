@@ -29,6 +29,25 @@ class FakeProjectDao : ProjectDao {
         projects.value = projects.value.filterNot { it.id == project.id } + project
     }
 
+    override suspend fun updateMetadata(
+        projectId: String,
+        name: String,
+        clientName: String,
+        updatedAtEpochMillis: Long
+    ) {
+        projects.value = projects.value.map { project ->
+            if (project.id == projectId) {
+                project.copy(
+                    name = name,
+                    clientName = clientName,
+                    updatedAtEpochMillis = updatedAtEpochMillis
+                )
+            } else {
+                project
+            }
+        }
+    }
+
     override suspend fun updateTaxSettings(
         projectId: String,
         taxRate: Double,
