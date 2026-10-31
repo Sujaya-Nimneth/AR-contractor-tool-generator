@@ -6,6 +6,7 @@ import android.graphics.Paint
 import android.graphics.Path
 import android.graphics.RectF
 import android.graphics.Typeface
+import androidx.core.graphics.withClip
 import com.arcontractor.estimator.data.repository.SurfaceQuoteLine
 import com.arcontractor.estimator.domain.geometry.AnalyzedCutout
 import com.arcontractor.estimator.domain.geometry.EdgeSegment
@@ -197,15 +198,14 @@ class BlueprintCanvasRenderer(
         val minY = mappedPoints.minOf { it.y }.toFloat()
         val maxY = mappedPoints.maxOf { it.y }.toFloat()
 
-        canvas.save()
-        canvas.clipPath(path)
-        val spacing = 7f
-        var x = minX - (maxY - minY)
-        while (x <= maxX) {
-            canvas.drawLine(x, maxY, x + (maxY - minY), minY, hatchPaint)
-            x += spacing
+        canvas.withClip(path) {
+            val spacing = 7f
+            var x = minX - (maxY - minY)
+            while (x <= maxX) {
+                drawLine(x, maxY, x + (maxY - minY), minY, hatchPaint)
+                x += spacing
+            }
         }
-        canvas.restore()
         canvas.drawPath(path, cutoutStrokePaint)
 
         val label = cutout.kind.name.replace('_', ' ')

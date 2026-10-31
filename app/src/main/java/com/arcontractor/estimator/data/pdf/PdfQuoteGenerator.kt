@@ -11,6 +11,7 @@ import android.text.Layout
 import android.text.StaticLayout
 import android.text.TextPaint
 import android.text.TextUtils
+import androidx.core.graphics.withTranslation
 import com.arcontractor.estimator.data.repository.ProjectWorkspace
 import com.arcontractor.estimator.data.repository.SurfaceQuoteLine
 import com.arcontractor.estimator.domain.estimation.ProjectQuoteSummary
@@ -959,10 +960,9 @@ class PdfQuoteGenerator(
             .setMaxLines(maxLines)
             .setEllipsize(TextUtils.TruncateAt.END)
             .build()
-        canvas.save()
-        canvas.translate(x, y)
-        layout.draw(canvas)
-        canvas.restore()
+        canvas.withTranslation(x, y) {
+            layout.draw(this)
+        }
         return y + layout.height
     }
 

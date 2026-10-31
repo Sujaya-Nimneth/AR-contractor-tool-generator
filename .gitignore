@@ -1,7 +1,9 @@
 # Gradle & Build Outputs
 .gradle/
+.kotlin/
 build/
 **/build/
+**/.kotlin/
 **/bin/
 local.properties
 
