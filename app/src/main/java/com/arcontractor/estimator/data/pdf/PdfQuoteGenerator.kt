@@ -37,6 +37,74 @@ class PdfQuoteGenerator(
         options: PdfExportOptions,
         outputFile: File
     ): Int {
+        val pagePlan = buildPagePlan(workspace, options)
+
+        val document = PdfDocument()
+        try {
+            pagePlan.specs.forEachIndexed { index, spec ->
+                val pageInfo = PdfDocument.PageInfo.Builder(
+                    options.paperSize.widthPoints,
+                    options.paperSize.heightPoints,
+                    index + 1
+                ).create()
+                val page = document.startPage(pageInfo)
+                val context = createPageContext(
+                    canvas = page.canvas,
+                    workspace = workspace,
+                    options = options,
+                    pagePlan = pagePlan,
+                    pageNumber = index + 1
+                )
+                drawPage(context, spec)
+                drawFooter(context)
+                document.finishPage(page)
+            }
+
+            outputFile.parentFile?.mkdirs()
+            FileOutputStream(outputFile).use(document::writeTo)
+            return pagePlan.specs.size
+        } catch (error: Throwable) {
+            outputFile.delete()
+            throw error
+        } finally {
+            document.close()
+        }
+    }
+
+    internal fun pageCount(
+        workspace: ProjectWorkspace,
+        options: PdfExportOptions
+    ): Int = buildPagePlan(workspace, options).specs.size
+
+    /**
+     * Renders one production page onto a native Android Canvas for preview and visual regression tests.
+     */
+    internal fun renderPagePreview(
+        workspace: ProjectWorkspace,
+        options: PdfExportOptions,
+        pageNumber: Int,
+        canvas: Canvas
+    ): Int {
+        val pagePlan = buildPagePlan(workspace, options)
+        require(pageNumber in 1..pagePlan.specs.size) {
+            "Page number $pageNumber is outside 1..${pagePlan.specs.size}."
+        }
+        val context = createPageContext(
+            canvas = canvas,
+            workspace = workspace,
+            options = options,
+            pagePlan = pagePlan,
+            pageNumber = pageNumber
+        )
+        drawPage(context, pagePlan.specs[pageNumber - 1])
+        drawFooter(context)
+        return pagePlan.specs.size
+    }
+
+    private fun buildPagePlan(
+        workspace: ProjectWorkspace,
+        options: PdfExportOptions
+    ): PagePlan {
         require(workspace.surfaces.isNotEmpty()) {
             "Measure at least one surface before exporting a quote."
         }
@@ -45,8 +113,6 @@ class PdfQuoteGenerator(
         }
 
         val quoteDate = LocalDate.now(clock)
-        val validUntil = quoteDate.plusDays(options.validityDays.toLong())
-        val quoteNumber = PdfQuoteFormat.quoteNumber(workspace.project.id, quoteDate)
         val tableRows = buildTableRows(workspace)
         val rowChunks = PdfQuoteFormat.chunkForPages(tableRows, ROWS_PER_TABLE_PAGE)
         val validSurfaces = workspace.surfaces.filter { it.analysis != null && it.estimate != null }
@@ -65,45 +131,38 @@ class PdfQuoteGenerator(
             }
             add(PageSpec.Terms)
         }
+        return PagePlan(
+            quoteDate = quoteDate,
+            validUntil = quoteDate.plusDays(options.validityDays.toLong()),
+            quoteNumber = PdfQuoteFormat.quoteNumber(workspace.project.id, quoteDate),
+            specs = pageSpecs
+        )
+    }
 
-        val document = PdfDocument()
-        try {
-            pageSpecs.forEachIndexed { index, spec ->
-                val pageInfo = PdfDocument.PageInfo.Builder(
-                    options.paperSize.widthPoints,
-                    options.paperSize.heightPoints,
-                    index + 1
-                ).create()
-                val page = document.startPage(pageInfo)
-                val context = PageContext(
-                    canvas = page.canvas,
-                    width = options.paperSize.widthPoints.toFloat(),
-                    height = options.paperSize.heightPoints.toFloat(),
-                    workspace = workspace,
-                    quoteNumber = quoteNumber,
-                    quoteDate = quoteDate,
-                    validUntil = validUntil,
-                    pageNumber = index + 1,
-                    pageCount = pageSpecs.size
-                )
-                when (spec) {
-                    PageSpec.Cover -> drawCover(context)
-                    is PageSpec.Blueprint -> drawBlueprintPage(context, spec)
-                    is PageSpec.LineItems -> drawLineItemsPage(context, spec)
-                    PageSpec.Terms -> drawTermsPage(context)
-                }
-                drawFooter(context)
-                document.finishPage(page)
-            }
+    private fun createPageContext(
+        canvas: Canvas,
+        workspace: ProjectWorkspace,
+        options: PdfExportOptions,
+        pagePlan: PagePlan,
+        pageNumber: Int
+    ): PageContext = PageContext(
+        canvas = canvas,
+        width = options.paperSize.widthPoints.toFloat(),
+        height = options.paperSize.heightPoints.toFloat(),
+        workspace = workspace,
+        quoteNumber = pagePlan.quoteNumber,
+        quoteDate = pagePlan.quoteDate,
+        validUntil = pagePlan.validUntil,
+        pageNumber = pageNumber,
+        pageCount = pagePlan.specs.size
+    )
 
-            outputFile.parentFile?.mkdirs()
-            FileOutputStream(outputFile).use(document::writeTo)
-            return pageSpecs.size
-        } catch (error: Throwable) {
-            outputFile.delete()
-            throw error
-        } finally {
-            document.close()
+    private fun drawPage(context: PageContext, spec: PageSpec) {
+        when (spec) {
+            PageSpec.Cover -> drawCover(context)
+            is PageSpec.Blueprint -> drawBlueprintPage(context, spec)
+            is PageSpec.LineItems -> drawLineItemsPage(context, spec)
+            PageSpec.Terms -> drawTermsPage(context)
         }
     }
 
@@ -1007,6 +1066,13 @@ class PdfQuoteGenerator(
         val validUntil: LocalDate,
         val pageNumber: Int,
         val pageCount: Int
+    )
+
+    private data class PagePlan(
+        val quoteDate: LocalDate,
+        val validUntil: LocalDate,
+        val quoteNumber: String,
+        val specs: List<PageSpec>
     )
 
     private sealed interface PageSpec {
