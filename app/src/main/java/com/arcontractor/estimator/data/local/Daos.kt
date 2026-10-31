@@ -29,6 +29,9 @@ interface ProjectDao {
         UPDATE projects
         SET name = :name,
             clientName = :clientName,
+            contractorName = :contractorName,
+            contractorContact = :contractorContact,
+            contractorLicense = :contractorLicense,
             updatedAtEpochMillis = :updatedAtEpochMillis
         WHERE id = :projectId
         """
@@ -37,6 +40,9 @@ interface ProjectDao {
         projectId: String,
         name: String,
         clientName: String,
+        contractorName: String,
+        contractorContact: String,
+        contractorLicense: String,
         updatedAtEpochMillis: Long
     )
 

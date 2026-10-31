@@ -33,6 +33,9 @@ class FakeProjectDao : ProjectDao {
         projectId: String,
         name: String,
         clientName: String,
+        contractorName: String,
+        contractorContact: String,
+        contractorLicense: String,
         updatedAtEpochMillis: Long
     ) {
         projects.value = projects.value.map { project ->
@@ -40,6 +43,9 @@ class FakeProjectDao : ProjectDao {
                 project.copy(
                     name = name,
                     clientName = clientName,
+                    contractorName = contractorName,
+                    contractorContact = contractorContact,
+                    contractorLicense = contractorLicense,
                     updatedAtEpochMillis = updatedAtEpochMillis
                 )
             } else {

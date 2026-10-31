@@ -174,7 +174,10 @@ class RepositoryTest {
         fixtures.projectRepository.updateProjectMetadata(
             projectId = projectId,
             name = "  Harbor Street renovation  ",
-            clientName = "  Morgan & Lee  "
+            clientName = "  Morgan & Lee  ",
+            contractorName = "  Northline Build Co.  ",
+            contractorContact = "  hello@northline.example | +1 555 0142  ",
+            contractorLicense = "  GC-10482  "
         )
 
         val workspace = fixtures.projectRepository.observeWorkspace(projectId)
@@ -182,6 +185,12 @@ class RepositoryTest {
             .first()
         assertEquals("Harbor Street renovation", workspace.project.name)
         assertEquals("Morgan & Lee", workspace.project.clientName)
+        assertEquals("Northline Build Co.", workspace.project.contractorName)
+        assertEquals(
+            "hello@northline.example | +1 555 0142",
+            workspace.project.contractorContact
+        )
+        assertEquals("GC-10482", workspace.project.contractorLicense)
     }
 
     private class RepositoryFixtures {

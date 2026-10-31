@@ -47,7 +47,10 @@ interface ProjectRepository {
     suspend fun updateProjectMetadata(
         projectId: String,
         name: String,
-        clientName: String
+        clientName: String,
+        contractorName: String,
+        contractorContact: String,
+        contractorLicense: String
     )
 
     suspend fun renameSurface(surfaceId: String, name: String)
@@ -125,6 +128,9 @@ class RoomProjectRepository(
             id = DEFAULT_PROJECT_ID,
             name = DEFAULT_PROJECT_NAME,
             clientName = "",
+            contractorName = "",
+            contractorContact = "",
+            contractorLicense = "",
             taxRate = 0.0,
             taxPolicy = TaxPolicy.TAX_TOTAL_SUBTOTAL.name,
             createdAtEpochMillis = timestamp,
@@ -224,13 +230,22 @@ class RoomProjectRepository(
     override suspend fun updateProjectMetadata(
         projectId: String,
         name: String,
-        clientName: String
+        clientName: String,
+        contractorName: String,
+        contractorContact: String,
+        contractorLicense: String
     ) {
         require(name.isNotBlank()) { "Project name cannot be blank." }
+        require(contractorName.length <= 120) { "Contractor name is too long." }
+        require(contractorContact.length <= 240) { "Contractor contact is too long." }
+        require(contractorLicense.length <= 120) { "Contractor license is too long." }
         projectDao.updateMetadata(
             projectId = projectId,
             name = name.trim(),
             clientName = clientName.trim(),
+            contractorName = contractorName.trim(),
+            contractorContact = contractorContact.trim(),
+            contractorLicense = contractorLicense.trim(),
             updatedAtEpochMillis = now()
         )
     }
