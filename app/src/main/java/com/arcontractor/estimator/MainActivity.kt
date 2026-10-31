@@ -1,10 +1,13 @@
 package com.arcontractor.estimator
 
+import android.content.ClipData
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -37,9 +40,11 @@ private fun EstimatorApp(container: AppContainer) {
     val quoteViewModel: QuoteViewModel = viewModel(
         factory = QuoteViewModel.Factory(
             projectRepository = container.projectRepository,
-            materialCatalogRepository = container.materialCatalogRepository
+            materialCatalogRepository = container.materialCatalogRepository,
+            quotePdfExporter = container.quotePdfExporter
         )
     )
+    val context = LocalContext.current
 
     NavHost(
         navController = navController,
@@ -52,6 +57,17 @@ private fun EstimatorApp(container: AppContainer) {
                     navController.navigate(MEASURE_ROUTE) {
                         launchSingleTop = true
                     }
+                },
+                onSharePdf = { result ->
+                    val shareIntent = Intent(Intent.ACTION_SEND).apply {
+                        type = "application/pdf"
+                        putExtra(Intent.EXTRA_STREAM, result.contentUri)
+                        clipData = ClipData.newRawUri("Contractor quote PDF", result.contentUri)
+                        addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                    }
+                    context.startActivity(
+                        Intent.createChooser(shareIntent, "Share contractor quote")
+                    )
                 }
             )
         }

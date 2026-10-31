@@ -2,6 +2,8 @@ package com.arcontractor.estimator
 
 import android.app.Application
 import com.arcontractor.estimator.data.local.AppDatabase
+import com.arcontractor.estimator.data.pdf.AndroidQuotePdfExporter
+import com.arcontractor.estimator.data.pdf.QuotePdfExporter
 import com.arcontractor.estimator.data.repository.ProjectRepository
 import com.arcontractor.estimator.data.repository.RoomMaterialCatalogRepository
 import com.arcontractor.estimator.data.repository.RoomProjectRepository
@@ -37,6 +39,9 @@ class AppContainer(application: Application) {
             surfaceDao = database.surfaceDao(),
             materialDao = database.materialCatalogDao()
         )
+
+    val quotePdfExporter: QuotePdfExporter =
+        AndroidQuotePdfExporter(application)
 
     fun initialize() {
         applicationScope.launch {

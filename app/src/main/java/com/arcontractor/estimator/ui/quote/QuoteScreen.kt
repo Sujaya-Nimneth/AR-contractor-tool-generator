@@ -40,6 +40,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -55,15 +56,25 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.arcontractor.estimator.data.repository.ProjectWorkspace
 import com.arcontractor.estimator.data.repository.SurfaceQuoteLine
+import com.arcontractor.estimator.data.pdf.PdfExportResult
 import com.arcontractor.estimator.domain.estimation.ProjectQuoteSummary
 import com.arcontractor.estimator.domain.estimation.TradeType
 
 @Composable
 fun QuoteScreen(
     viewModel: QuoteViewModel,
-    onMeasureSurface: () -> Unit
+    onMeasureSurface: () -> Unit,
+    onSharePdf: (PdfExportResult) -> Unit
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+    val exportedPdf = state.exportedPdf
+
+    LaunchedEffect(exportedPdf?.contentUri) {
+        if (exportedPdf != null) {
+            onSharePdf(exportedPdf)
+            viewModel.onAction(QuoteAction.ConsumeExportedPdf)
+        }
+    }
 
     Box(
         modifier = Modifier
@@ -83,6 +94,18 @@ fun QuoteScreen(
 
     if (state.isCatalogOpen) {
         MaterialCatalogDialog(
+            state = state,
+            onAction = viewModel::onAction
+        )
+    }
+    if (state.isProjectDetailsOpen) {
+        ProjectDetailsDialog(
+            state = state,
+            onAction = viewModel::onAction
+        )
+    }
+    if (state.isExportDialogOpen) {
+        PdfExportDialog(
             state = state,
             onAction = viewModel::onAction
         )
@@ -244,6 +267,16 @@ private fun QuoteWorkspace(
                         taxRate = workspace.project.taxRate,
                         taxPolicy = workspace.quote.taxPolicy,
                         onAction = onAction,
+                        modifier = Modifier.padding(top = 14.dp)
+                    )
+                }
+
+                item {
+                    QuoteDeliveryPanel(
+                        workspace = workspace,
+                        isExporting = state.isExportingPdf,
+                        onEditProject = { onAction(QuoteAction.OpenProjectDetails) },
+                        onExportPdf = { onAction(QuoteAction.OpenExportDialog) },
                         modifier = Modifier.padding(top = 14.dp)
                     )
                 }

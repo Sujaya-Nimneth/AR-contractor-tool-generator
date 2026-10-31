@@ -7,6 +7,10 @@ import com.arcontractor.estimator.data.repository.FakeProjectDao
 import com.arcontractor.estimator.data.repository.FakeSurfaceDao
 import com.arcontractor.estimator.data.repository.RoomMaterialCatalogRepository
 import com.arcontractor.estimator.data.repository.RoomProjectRepository
+import com.arcontractor.estimator.data.pdf.PdfExportOptions
+import com.arcontractor.estimator.data.pdf.PdfExportResult
+import com.arcontractor.estimator.data.pdf.QuotePdfExporter
+import com.arcontractor.estimator.data.repository.ProjectWorkspace
 import com.arcontractor.estimator.domain.estimation.TaxPolicy
 import com.arcontractor.estimator.domain.estimation.WastePreset
 import com.arcontractor.estimator.domain.geometry.Vec3
@@ -128,7 +132,57 @@ class QuoteViewModelTest {
         assertEquals(null, viewModel.uiState.value.catalogEditor)
     }
 
-    private fun createViewModel(): QuoteViewModel {
+    @Test
+    fun `project and contractor details are saved from the quote editor`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.onAction(QuoteAction.OpenProjectDetails)
+        val draft = viewModel.uiState.value.projectDetailsDraft ?: error("Missing project editor")
+        viewModel.onAction(
+            QuoteAction.UpdateProjectDetails(
+                draft.copy(
+                    name = "  Harbor Street renovation  ",
+                    clientName = "  Morgan & Lee  ",
+                    contractorName = "  Northline Build Co.  ",
+                    contractorContact = "  hello@northline.example  ",
+                    contractorLicense = "  GC-10482  "
+                )
+            )
+        )
+        viewModel.onAction(QuoteAction.SaveProjectDetails)
+
+        val state = viewModel.uiState.value
+        val project = state.workspace?.project ?: error("Missing project")
+        assertEquals("Harbor Street renovation", project.name)
+        assertEquals("Morgan & Lee", project.clientName)
+        assertEquals("Northline Build Co.", project.contractorName)
+        assertEquals("hello@northline.example", project.contractorContact)
+        assertEquals("GC-10482", project.contractorLicense)
+        assertFalse(state.isProjectDetailsOpen)
+        assertFalse(state.isSavingProjectDetails)
+    }
+
+    @Test
+    fun `export is blocked before a surface has been measured`() = runTest {
+        val exporter = RecordingQuotePdfExporter()
+        val viewModel = createViewModel(exporter)
+
+        viewModel.onAction(QuoteAction.OpenExportDialog)
+        viewModel.onAction(QuoteAction.SetExportPaperSize(com.arcontractor.estimator.data.pdf.PdfPaperSize.LETTER))
+        viewModel.onAction(QuoteAction.SetExportValidityDays("45"))
+        viewModel.onAction(QuoteAction.ExportPdf)
+
+        val state = viewModel.uiState.value
+        assertEquals(0, exporter.callCount)
+        assertFalse(state.isExportingPdf)
+        assertTrue(state.message?.isError == true)
+        assertEquals(com.arcontractor.estimator.data.pdf.PdfPaperSize.LETTER, state.exportDraft.paperSize)
+        assertEquals(45, state.exportDraft.validityDays)
+    }
+
+    private fun createViewModel(
+        exporter: QuotePdfExporter = RecordingQuotePdfExporter()
+    ): QuoteViewModel {
         val projectDao = FakeProjectDao()
         val surfaceDao = FakeSurfaceDao()
         val materialDao = FakeMaterialCatalogDao()
@@ -146,8 +200,25 @@ class QuoteViewModelTest {
         )
         return ViewModelProvider(
             viewModelStore,
-            QuoteViewModel.Factory(projectRepository, materialRepository)
+            QuoteViewModel.Factory(
+                projectRepository = projectRepository,
+                materialCatalogRepository = materialRepository,
+                quotePdfExporter = exporter
+            )
         )[QuoteViewModel::class.java]
+    }
+
+    private class RecordingQuotePdfExporter : QuotePdfExporter {
+        var callCount: Int = 0
+            private set
+
+        override suspend fun export(
+            workspace: ProjectWorkspace,
+            options: PdfExportOptions
+        ): PdfExportResult {
+            callCount++
+            error("Export fixture is not configured for this test.")
+        }
     }
 
     private companion object {

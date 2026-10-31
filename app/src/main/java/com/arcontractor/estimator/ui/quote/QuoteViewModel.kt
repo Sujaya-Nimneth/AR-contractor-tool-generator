@@ -9,6 +9,8 @@ import com.arcontractor.estimator.data.repository.ProjectRepository
 import com.arcontractor.estimator.data.repository.ProjectWorkspace
 import com.arcontractor.estimator.data.repository.SurfaceMeasurementDraft
 import com.arcontractor.estimator.data.repository.SurfaceQuoteLine
+import com.arcontractor.estimator.data.pdf.PdfExportOptions
+import com.arcontractor.estimator.data.pdf.QuotePdfExporter
 import com.arcontractor.estimator.domain.estimation.DefaultMaterialCatalog
 import com.arcontractor.estimator.domain.estimation.MaterialSpec
 import com.arcontractor.estimator.domain.estimation.PackageUnitType
@@ -28,6 +30,7 @@ import kotlinx.coroutines.launch
 class QuoteViewModel(
     private val projectRepository: ProjectRepository,
     private val materialCatalogRepository: MaterialCatalogRepository,
+    private val quotePdfExporter: QuotePdfExporter,
     private val idGenerator: () -> String = { UUID.randomUUID().toString() }
 ) : ViewModel() {
 
@@ -56,6 +59,43 @@ class QuoteViewModel(
             is QuoteAction.DeleteSurface -> deleteSurface(action)
             is QuoteAction.SetProjectTaxRate -> setProjectTaxRate(action.rate)
             is QuoteAction.SetProjectTaxPolicy -> setProjectTaxPolicy(action.policy)
+            QuoteAction.OpenProjectDetails -> openProjectDetails()
+            QuoteAction.CloseProjectDetails -> _uiState.update {
+                it.copy(
+                    isProjectDetailsOpen = false,
+                    projectDetailsDraft = null
+                )
+            }
+
+            is QuoteAction.UpdateProjectDetails -> _uiState.update {
+                it.copy(projectDetailsDraft = action.draft)
+            }
+
+            QuoteAction.SaveProjectDetails -> saveProjectDetails()
+            QuoteAction.OpenExportDialog -> _uiState.update {
+                it.copy(isExportDialogOpen = true, message = null)
+            }
+
+            QuoteAction.CloseExportDialog -> _uiState.update {
+                if (it.isExportingPdf) it else it.copy(isExportDialogOpen = false)
+            }
+
+            is QuoteAction.SetExportPaperSize -> _uiState.update {
+                it.copy(
+                    exportDraft = it.exportDraft.copy(paperSize = action.paperSize)
+                )
+            }
+
+            is QuoteAction.SetExportValidityDays -> _uiState.update {
+                it.copy(
+                    exportDraft = it.exportDraft.copy(
+                        validityDaysText = action.text.filter(Char::isDigit).take(3)
+                    )
+                )
+            }
+
+            QuoteAction.ExportPdf -> exportPdf()
+            QuoteAction.ConsumeExportedPdf -> _uiState.update { it.copy(exportedPdf = null) }
             QuoteAction.OpenCatalog -> _uiState.update {
                 it.copy(isCatalogOpen = true, catalogEditor = null)
             }
@@ -289,6 +329,108 @@ class QuoteViewModel(
         }
     }
 
+    private fun openProjectDetails() {
+        val project = _uiState.value.workspace?.project ?: return
+        _uiState.update {
+            it.copy(
+                isProjectDetailsOpen = true,
+                projectDetailsDraft = ProjectMetadataDraft(
+                    name = project.name,
+                    clientName = project.clientName,
+                    contractorName = project.contractorName,
+                    contractorContact = project.contractorContact,
+                    contractorLicense = project.contractorLicense
+                ),
+                message = null
+            )
+        }
+    }
+
+    private fun saveProjectDetails() {
+        val projectId = _uiState.value.projectId ?: return
+        val draft = _uiState.value.projectDetailsDraft ?: return
+        if (_uiState.value.isSavingProjectDetails) return
+        if (draft.name.isBlank()) {
+            showError("Project name cannot be blank.")
+            return
+        }
+
+        _uiState.update { it.copy(isSavingProjectDetails = true, message = null) }
+        viewModelScope.launch {
+            runCatching {
+                projectRepository.updateProjectMetadata(
+                    projectId = projectId,
+                    name = draft.name,
+                    clientName = draft.clientName,
+                    contractorName = draft.contractorName,
+                    contractorContact = draft.contractorContact,
+                    contractorLicense = draft.contractorLicense
+                )
+            }.onSuccess {
+                _uiState.update {
+                    it.copy(
+                        isSavingProjectDetails = false,
+                        isProjectDetailsOpen = false,
+                        projectDetailsDraft = null,
+                        message = QuoteMessage("Project and contractor details saved.")
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update { it.copy(isSavingProjectDetails = false) }
+                showError(error.message ?: "Project details could not be saved.")
+            }
+        }
+    }
+
+    private fun exportPdf() {
+        if (_uiState.value.isExportingPdf) return
+        val workspace = _uiState.value.workspace ?: run {
+            showError("Open a project before exporting a quote.")
+            return
+        }
+        if (workspace.surfaces.isEmpty()) {
+            showError("Measure at least one surface before exporting a quote.")
+            return
+        }
+        if (workspace.surfaces.any { it.analysis == null || it.estimate == null }) {
+            showError("Fix saved surfaces with missing geometry before exporting the quote.")
+            return
+        }
+        val validityDays = _uiState.value.exportDraft.validityDays ?: run {
+            showError("Quote validity must be a whole number from 1 to 365 days.")
+            return
+        }
+        val options = PdfExportOptions(
+            paperSize = _uiState.value.exportDraft.paperSize,
+            validityDays = validityDays
+        )
+
+        _uiState.update { it.copy(isExportingPdf = true, message = null) }
+        viewModelScope.launch {
+            runCatching {
+                quotePdfExporter.export(
+                    workspace = workspace,
+                    options = options
+                )
+            }.onSuccess { result ->
+                _uiState.update {
+                    it.copy(
+                        isExportingPdf = false,
+                        isExportDialogOpen = false,
+                        exportedPdf = result,
+                        message = QuoteMessage(
+                            "PDF ready: ${result.pageCount} page" +
+                                if (result.pageCount == 1) "." else "s."
+                        )
+                    )
+                }
+            }.onFailure { error ->
+                _uiState.update { it.copy(isExportingPdf = false) }
+                showError(error.message ?: "The quote PDF could not be generated.")
+            }
+        }
+    }
+
     private fun openCatalogEditor(materialId: String?) {
         val material = materialId?.let { id ->
             _uiState.value.workspace?.materials?.firstOrNull { it.id == id }
@@ -476,12 +618,17 @@ class QuoteViewModel(
 
     class Factory(
         private val projectRepository: ProjectRepository,
-        private val materialCatalogRepository: MaterialCatalogRepository
+        private val materialCatalogRepository: MaterialCatalogRepository,
+        private val quotePdfExporter: QuotePdfExporter
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
             require(modelClass.isAssignableFrom(QuoteViewModel::class.java))
-            return QuoteViewModel(projectRepository, materialCatalogRepository) as T
+            return QuoteViewModel(
+                projectRepository = projectRepository,
+                materialCatalogRepository = materialCatalogRepository,
+                quotePdfExporter = quotePdfExporter
+            ) as T
         }
     }
 }

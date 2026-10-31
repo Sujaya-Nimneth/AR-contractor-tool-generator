@@ -2,6 +2,8 @@ package com.arcontractor.estimator.ui.quote
 
 import com.arcontractor.estimator.data.repository.ProjectWorkspace
 import com.arcontractor.estimator.data.repository.SurfaceQuoteLine
+import com.arcontractor.estimator.data.pdf.PdfExportResult
+import com.arcontractor.estimator.data.pdf.PdfPaperSize
 import com.arcontractor.estimator.domain.estimation.PackageUnitType
 import com.arcontractor.estimator.domain.estimation.PricingAreaUnit
 import com.arcontractor.estimator.domain.estimation.TaxPolicy
@@ -39,15 +41,38 @@ data class CatalogEditorDraft(
     val isNew: Boolean
 )
 
+data class ProjectMetadataDraft(
+    val name: String,
+    val clientName: String,
+    val contractorName: String,
+    val contractorContact: String,
+    val contractorLicense: String
+)
+
+data class QuoteExportDraft(
+    val paperSize: PdfPaperSize = PdfPaperSize.A4,
+    val validityDaysText: String = "30"
+) {
+    val validityDays: Int?
+        get() = validityDaysText.toIntOrNull()?.takeIf { it in 1..365 }
+}
+
 data class QuoteUiState(
     val isLoading: Boolean = true,
     val isSavingMeasurement: Boolean = false,
     val isSavingCatalog: Boolean = false,
+    val isSavingProjectDetails: Boolean = false,
+    val isExportingPdf: Boolean = false,
     val projectId: String? = null,
     val workspace: ProjectWorkspace? = null,
     val selectedSurfaceId: String? = null,
     val isCatalogOpen: Boolean = false,
     val catalogEditor: CatalogEditorDraft? = null,
+    val isProjectDetailsOpen: Boolean = false,
+    val projectDetailsDraft: ProjectMetadataDraft? = null,
+    val isExportDialogOpen: Boolean = false,
+    val exportDraft: QuoteExportDraft = QuoteExportDraft(),
+    val exportedPdf: PdfExportResult? = null,
     val message: QuoteMessage? = null
 ) {
     val selectedSurface: SurfaceQuoteLine?
@@ -69,6 +94,16 @@ sealed interface QuoteAction {
     data class DeleteSurface(val surfaceId: String) : QuoteAction
     data class SetProjectTaxRate(val rate: Double) : QuoteAction
     data class SetProjectTaxPolicy(val policy: TaxPolicy) : QuoteAction
+    data object OpenProjectDetails : QuoteAction
+    data object CloseProjectDetails : QuoteAction
+    data class UpdateProjectDetails(val draft: ProjectMetadataDraft) : QuoteAction
+    data object SaveProjectDetails : QuoteAction
+    data object OpenExportDialog : QuoteAction
+    data object CloseExportDialog : QuoteAction
+    data class SetExportPaperSize(val paperSize: PdfPaperSize) : QuoteAction
+    data class SetExportValidityDays(val text: String) : QuoteAction
+    data object ExportPdf : QuoteAction
+    data object ConsumeExportedPdf : QuoteAction
     data object OpenCatalog : QuoteAction
     data object CloseCatalog : QuoteAction
     data class EditCatalogMaterial(val materialId: String?) : QuoteAction
