@@ -1,6 +1,6 @@
 # AR Contractor Quote & Material Estimation App — Master Engineering Plan
 
-> **Architecture Status:** **Phase 2 Complete & Verified** (`:core-domain:test` 23/23 + `:app:testDebugUnitTest` 12/12 + `:app:compileDebugKotlin` and debug APK green) — **Awaiting Review for Phase 3**
+> **Architecture Status:** **Phase 3 Complete & Verified** (`:core-domain:test` 23/23 + `:app:testDebugUnitTest` 27/27 + `:app:compileDebugKotlin` and debug APK green) — **Awaiting Review for Phase 4**
 > **Target Platform:** Native Android (Min SDK 26 / Target SDK 35 / Compile SDK 36, Kotlin 2.2.0, Jetpack Compose Material 3)  
 > **Offline Guarantee:** 100% On-Device Spatial Math, Room Persistence, and Vector `PdfDocument` Generation (Zero Cloud Dependencies)
 
@@ -129,10 +129,13 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
 - [x] `spatial.tracking.PolygonSceneRenderer`: Filament/SceneView 3D vertex sphere nodes, dynamic cylinder/line edge extrusions, translucent triangulated surface fill, and red cutout wireframes
 - [x] `ui.ar.ArMeasureViewModel` & `ArMeasureScreen`: Unidirectional MVI state machine (`Scanning` → `LockingPlane` → `PlacingOuterBoundary` → `PlacingCutout` → `Completed`), live dimension pills, flatness badge, Undo/Redo/Close Polygon controls
 
-### Phase 3: Room Persistence, Material Catalog & Quote Summary UI *(Pending Phase 2 Review)*
-- [ ] `data.local`: Room database (`AppDatabase`), entities (`ProjectEntity`, `SurfaceEntity`, `CutoutEntity`, `MaterialSpecEntity`), JSON/blob vertex type converters, DAOs, and pre-seeded contractor material catalog
-- [ ] `data.repository.ProjectRepository` & `MaterialCatalogRepository` with `Flow` reactive queries
-- [ ] `ui.quote`: Material Catalog editor, Trade/Waste selector, Labor & Tax adjuster, and real-time `QuoteSummaryScreen`
+### Phase 3: Room Persistence, Material Catalog & Quote Summary UI *(Complete & Verified)*
+- [x] `data.local`: singleton Room database (`AppDatabase`), project/surface/cutout/material entities, JSON vertex and trade-parameter converters, foreign-key-safe DAOs, exported schema, and idempotently seeded contractor material catalog
+- [x] `data.repository.ProjectRepository` & `MaterialCatalogRepository` with `Flow` reactive queries, default-project bootstrap, raw-anchor reconstruction, live catalog/tax recomputation, and surface pricing overrides
+- [x] `EstimatorApplication` / `AppContainer`: offline database singleton, repository wiring, startup seeding, and Compose ViewModel factory
+- [x] AR-to-quote handoff: completed measurements save raw 3D anchors and cutouts, then open the quote workspace with the saved surface selected
+- [x] `ui.quote`: material catalog editor, surface material selector, trade waste presets/custom allowance, labor override, project tax policy/rate adjuster, coverage ledger, itemized totals, and responsive real-time quote summary
+- [x] Persistence/UI tests: converter and trade-parameter round-trips, idempotent seeding, FK-safe deletion, raw-anchor reconstruction, pricing/tax invalidation, AR measurement save, and quote catalog actions
 
 ### Phase 4: Native Vector Blueprint & PDF Quote Generator *(Pending Phase 3 Review)*
 - [ ] `data.pdf.BlueprintCanvasRenderer`: Aspect-preserving 2D $(u_i, v_i)$ bounding-box normalization, outer polygon stroke/fill, diagonal-hatched cutout zones, outward-offset edge dimension labels, scale bar, and surface summary legend
@@ -158,7 +161,7 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
 
 ---
 
-## 7. Multi-Agent Environment & Phase 2 Quickstart Reference
+## 7. Multi-Agent Environment & Phase 2/3 Quickstart Reference
 
 ### A. Verified Build & Test Commands (macOS Toolchain Note)
 Because the system default `/usr/bin/java` is JDK 24 while Android Gradle Plugin `8.13.0` (`JdkImageTransform` / `jlink`) targets JDK 17–21, **always export Android Studio's bundled JDK 21 (`JBR`)** before running `./gradlew`:
@@ -166,11 +169,14 @@ Because the system default `/usr/bin/java` is JDK 24 while Android Gradle Plugin
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
-# Run pure JVM geometry & estimation unit tests (23 tests, ~1s warm):
-./gradlew :core-domain:test
+# Run pure JVM geometry/estimation tests and the Android persistence/UI ViewModel suite:
+./gradlew :core-domain:test :app:testDebugUnitTest
 
-# Verify Android app + KSP + Compose + SceneView/ARCore compilation:
+# Verify Android app + KSP + Compose + SceneView/ARCore + Room compilation:
 ./gradlew :app:compileDebugKotlin
+
+# Assemble the installable debug APK:
+./gradlew :app:assembleDebug
 ```
 
 > **Do NOT bump** `arsceneview` (`2.3.0`), `arcore` (`1.48.0`), or `room` (`2.7.2`) in `gradle/libs.versions.toml` without upgrading AGP to 9.1+ and installing `android-37`; the locked versions in `libs.versions.toml` are already cached and verified against `compileSdk = 36` and `AGP 8.13.0`.
@@ -200,7 +206,31 @@ To prevent SceneView 1.x vs 2.x API drift, use these exact classes verified insi
   - `MaterialEstimationEngine.kt` (`MaterialEstimationEngine`)
   - `ProjectQuoteAggregator.kt` (`ProjectQuoteAggregator`, `DefaultMaterialCatalog`)
 
-### D. Phase 2 Exit Criteria (For Phase 2 Agent)
+### D. Phase 3 Completed File Inventory
+- `app/src/main/java/com/arcontractor/estimator/data/local/`
+  - `AppDatabase.kt` (thread-safe singleton, schema export, DAO registry)
+  - `Entities.kt` (`ProjectEntity`, `SurfaceEntity`, `CutoutEntity`, `MaterialSpecEntity`, `SurfaceWithCutouts`)
+  - `RoomConverters.kt` (JSON `Vec3` / vertex-list persistence)
+  - `TradeParametersCodec.kt` (all four trade parameter variants)
+  - `Daos.kt` (reactive queries, transactional surface replacement, pricing/tax updates)
+  - `EntityMappers.kt` (domain/entity mappings and globally scoped cutout IDs)
+- `app/src/main/java/com/arcontractor/estimator/data/repository/`
+  - `ProjectModels.kt` (`SurfaceMeasurementDraft`, `SurfaceQuoteLine`, `ProjectWorkspace`)
+  - `ProjectRepository.kt` (default project, raw-anchor reconstruction, quote aggregation, surface/tax mutations)
+  - `MaterialCatalogRepository.kt` (one-time seeding, reactive catalog, FK-safe deletion)
+- `app/src/main/java/com/arcontractor/estimator/`
+  - `EstimatorApplication.kt` (application container and background bootstrap)
+  - `MainActivity.kt` (Quote ↔ AR navigation and completed-measurement save)
+- `app/src/main/java/com/arcontractor/estimator/ui/quote/`
+  - `QuoteUiState.kt`, `QuoteViewModel.kt` (MVI state and persistence actions)
+  - `QuoteScreen.kt`, `QuoteComponents.kt` (responsive total, coverage ledger, surface list, totals)
+  - `SurfacePricingPanel.kt` (material/waste/labor overrides and line items)
+  - `ProjectAdjustmentsPanel.kt` (tax rate and taxable-subtotal policy)
+  - `MaterialCatalogDialog.kt` (full catalog editor for all four trades)
+- `app/schemas/com.arcontractor.estimator.data.local.AppDatabase/1.json` (versioned Room schema)
+- `app/src/test/java/com/arcontractor/estimator/data/` and `.../ui/quote/` (27 passing Android JVM tests)
+
+### E. Phase 2 Exit Criteria (For Phase 2 Agent)
 1. Zero `TODO`s or placeholder math; all spatial filtering, coplanarity checks, and polygon triangulation must delegate to `:core-domain`.
 2. Center-reticle raycast prioritizes in-polygon `Plane` hits, then `DepthPoint` hits, extracting world-space `[x, y, z]` and outward surface normal `[nx, ny, nz]`.
 3. Compose MVI state machine supports: Plane scanning → Outer boundary vertex placement (with live edge length & coplanarity status) → Closing outer polygon → Optional interior/door cutout placement → Undo/Redo vertex actions → Live area/perimeter HUD.
