@@ -3,8 +3,11 @@
 Read [`MASTER_PLAN.md`](./MASTER_PLAN.md) **first** before planning or writing any code. It is the single source of truth for architecture, coordinate conventions, completed modules, and phase checklists.
 
 ## Current Project State
-- **Phase 1 (Complete & Verified):** `:core-domain` pure Kotlin JVM Spatial Geometry (`domain.geometry`) and Material/Consumables Estimation (`domain.estimation`) engines + 23 passing JUnit tests + Gradle version catalog (`gradle/libs.versions.toml`) + `:app` Compose skeleton.
-- **Next Active Phase:** **Phase 2** — ARCore + SceneView (`io.github.sceneview:arsceneview:2.3.0`) camera session controller, center-reticle hit-testing state machine (`spatial.tracking`), and Filament 3D vertex/extruded-line/hole-punched polygon mesh rendering in Jetpack Compose (`ui.ar`).
+- **Phase 1 (Complete & Verified):** `:core-domain` pure Kotlin JVM Spatial Geometry (`domain.geometry`) and Material/Consumables Estimation (`domain.estimation`) engines + 23 passing JUnit tests + Gradle version catalog (`gradle/libs.versions.toml`).
+- **Phase 2 (Complete & Verified):** ARCore + SceneView camera session control, center-reticle hit testing, EMA/coplanarity filtering, hole-punched Filament surface meshes, and the Compose AR measurement state machine.
+- **Phase 3 (Complete & Verified):** Room persistence, seeded material catalog, repository/quote aggregation, AR-to-quote handoff, and the responsive quote workspace.
+- **Phase 4 (Complete & Verified):** Native A4/Letter vector blueprint and multi-page PDF quote generation, contractor branding, private-file export, and Android share-sheet integration.
+- **Next Active Phase:** None. The project is ready for final review.
 
 ## Strict Engineering Rules
 1. **No Stubs:** Never write `// TODO` or placeholder math/UI logic. Deliver complete, production-compilable code.

@@ -1,6 +1,6 @@
 # AR Contractor Quote & Material Estimation App — Master Engineering Plan
 
-> **Architecture Status:** **Phase 3 Complete & Verified** (`:core-domain:test` 23/23 + `:app:testDebugUnitTest` 27/27 + `:app:compileDebugKotlin` and debug APK green) — **Awaiting Review for Phase 4**
+> **Architecture Status:** **Phase 4 Complete & Verified** (`:core-domain:test` 23/23 + `:app:testDebugUnitTest` 37/37 + `:app:compileDebugKotlin`, `:app:compileDebugAndroidTestKotlin`, `:app:assembleDebug`, and `:app:lintDebug` green) — **Ready for Final Review**
 > **Target Platform:** Native Android (Min SDK 26 / Target SDK 35 / Compile SDK 36, Kotlin 2.2.0, Jetpack Compose Material 3)  
 > **Offline Guarantee:** 100% On-Device Spatial Math, Room Persistence, and Vector `PdfDocument` Generation (Zero Cloud Dependencies)
 
@@ -137,9 +137,9 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
 - [x] `ui.quote`: material catalog editor, surface material selector, trade waste presets/custom allowance, labor override, project tax policy/rate adjuster, coverage ledger, itemized totals, and responsive real-time quote summary
 - [x] Persistence/UI tests: converter and trade-parameter round-trips, idempotent seeding, FK-safe deletion, raw-anchor reconstruction, pricing/tax invalidation, AR measurement save, and quote catalog actions
 
-### Phase 4: Native Vector Blueprint & PDF Quote Generator *(Pending Phase 3 Review)*
-- [ ] `data.pdf.BlueprintCanvasRenderer`: Aspect-preserving 2D $(u_i, v_i)$ bounding-box normalization, outer polygon stroke/fill, diagonal-hatched cutout zones, outward-offset edge dimension labels, scale bar, and surface summary legend
-- [ ] `data.pdf.PdfQuoteGenerator`: Multi-page A4/Letter `PdfDocument` layout with contractor branding header, client metadata, vector blueprint diagram, itemized materials/consumables/labor table, tax/total summary, validity date, and client signature block + Android `FileProvider` share sheet integration
+### Phase 4: Native Vector Blueprint & PDF Quote Generator *(Complete & Verified)*
+- [x] `data.pdf.BlueprintCanvasRenderer`: Aspect-preserving 2D $(u_i, v_i)$ bounding-box normalization, outer polygon stroke/fill, diagonal-hatched cutout zones, outward-offset edge dimension labels, scale bar, and surface summary legend
+- [x] `data.pdf.PdfQuoteGenerator`: Multi-page A4/Letter `PdfDocument` layout with contractor branding header, client metadata, vector blueprint diagram, itemized materials/consumables/labor table, tax/total summary, validity date, and client signature block + Android `FileProvider` share sheet integration
 
 ---
 
@@ -161,7 +161,7 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
 
 ---
 
-## 7. Multi-Agent Environment & Phase 2/3 Quickstart Reference
+## 7. Verification, Environment & Completed File Inventory
 
 ### A. Verified Build & Test Commands (macOS Toolchain Note)
 Because the system default `/usr/bin/java` is JDK 24 while Android Gradle Plugin `8.13.0` (`JdkImageTransform` / `jlink`) targets JDK 17–21, **always export Android Studio's bundled JDK 21 (`JBR`)** before running `./gradlew`:
@@ -230,10 +230,35 @@ To prevent SceneView 1.x vs 2.x API drift, use these exact classes verified insi
 - `app/schemas/com.arcontractor.estimator.data.local.AppDatabase/1.json` (versioned Room schema)
 - `app/src/test/java/com/arcontractor/estimator/data/` and `.../ui/quote/` (27 passing Android JVM tests)
 
-### E. Phase 2 Exit Criteria (For Phase 2 Agent)
+### E. Phase 4 Completed File Inventory
+- `app/src/main/java/com/arcontractor/estimator/data/pdf/`
+  - `PdfModels.kt` (`PdfPaperSize`, `PdfExportOptions`, `PdfExportResult`, `QuotePdfExporter`)
+  - `PdfQuoteFormat.kt` (deterministic quote numbers, filenames, currency/quantity formatting, page chunking)
+  - `BlueprintViewport.kt` (aspect-preserving metric viewport, 12% callout margin, planar-to-page inversion, scale selection)
+  - `BlueprintCanvasRenderer.kt` (vector surface boundary, hatched cutouts, dual-unit edge dimensions, scale bar, legend)
+  - `PdfQuoteGenerator.kt` (shared native page layout for cover, per-surface blueprints, paginated item table, totals, terms, and signature)
+  - `AndroidQuotePdfExporter.kt` (private PDF storage, deterministic filename, `FileProvider` URI generation)
+- `app/src/main/java/com/arcontractor/estimator/ui/quote/`
+  - `PdfExportDialog.kt` (paper size, validity, validation state, export progress)
+  - `QuoteScreen.kt`, `QuoteViewModel.kt`, `QuoteUiState.kt` (export orchestration, share-sheet handoff, branded project editing)
+- `app/src/main/AndroidManifest.xml` and `app/src/main/res/xml/file_paths.xml` (read-only `FileProvider` configuration)
+- `app/schemas/com.arcontractor.estimator.data.local.AppDatabase/2.json` (contractor branding metadata and `MIGRATION_1_2`)
+- `app/src/test/java/com/arcontractor/estimator/data/pdf/`
+  - `PdfQuoteFormatTest.kt`, `BlueprintViewportTest.kt`
+  - `PdfQuoteGeneratorTest.kt` (native A4/Letter rendering, non-blank pages, safe page borders, PNG preview generation)
+- `app/src/androidTest/java/com/arcontractor/estimator/data/pdf/PdfQuoteGeneratorInstrumentedTest.kt`
+  - Real Android `PdfDocument` generation, `PdfRenderer` page-count/content verification, and readable `FileProvider` URI validation
+- Verified test totals: `:core-domain:test` 23/23 and `:app:testDebugUnitTest` 37/37, with `0` lint errors.
+
+### F. Phase 2 Exit Criteria (Verified)
 1. Zero `TODO`s or placeholder math; all spatial filtering, coplanarity checks, and polygon triangulation must delegate to `:core-domain`.
 2. Center-reticle raycast prioritizes in-polygon `Plane` hits, then `DepthPoint` hits, extracting world-space `[x, y, z]` and outward surface normal `[nx, ny, nz]`.
 3. Compose MVI state machine supports: Plane scanning → Outer boundary vertex placement (with live edge length & coplanarity status) → Closing outer polygon → Optional interior/door cutout placement → Undo/Redo vertex actions → Live area/perimeter HUD.
 4. Both `./gradlew :core-domain:test` and `./gradlew :app:compileDebugKotlin` (plus any Phase 2 ViewModel/state-machine unit tests in `:app:testDebugUnitTest`) pass cleanly, and Section 5 of `MASTER_PLAN.md` is updated before stopping for review.
 
+### G. Phase 4 Exit Criteria (Verified)
+1. A4 and US Letter documents render as valid, multi-page vector PDFs with contractor/client metadata, one blueprint page per measured surface, itemized material/consumable/labor lines, totals, validity, terms, and a signature block.
+2. Blueprint viewports preserve aspect ratio, invert planar `+v` to page `-y`, keep outward dimension callouts inside the page, and render hatched door/window cutouts with dual metric/imperial labels.
+3. Exports are written to app-private storage and exposed only through the configured read-only `FileProvider` share URI.
+4. Native previews, unit tests, instrumentation-test compilation, debug APK assembly, and Android lint pass with no errors; the tracked Room schema matches the production branding migration.
 
