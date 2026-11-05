@@ -6,7 +6,6 @@ import android.content.Intent
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.provider.Settings
-import androidx.core.content.ContextCompat
 import com.google.ar.core.exceptions.CameraNotAvailableException
 import com.google.ar.core.exceptions.FatalException
 import com.google.ar.core.exceptions.UnavailableApkTooOldException
