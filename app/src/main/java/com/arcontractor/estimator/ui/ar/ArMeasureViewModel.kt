@@ -1,6 +1,7 @@
 package com.arcontractor.estimator.ui.ar
 
 import androidx.lifecycle.ViewModel
+import androidx.lifecycle.SavedStateHandle
 import com.arcontractor.estimator.domain.geometry.AnalyzedSurfacePolygon
 import com.arcontractor.estimator.domain.geometry.CoplanarityConfig
 import com.arcontractor.estimator.domain.geometry.CoplanarityRejectionReason
@@ -26,7 +27,9 @@ import kotlinx.coroutines.flow.asStateFlow
  * Geometry analysis is recomputed from raw 3D anchors after every structural edit. The domain
  * engine remains the only source of area, perimeter, triangulation, and flatness calculations.
  */
-class ArMeasureViewModel : ViewModel() {
+class ArMeasureViewModel(
+    private val savedStateHandle: SavedStateHandle = SavedStateHandle()
+) : ViewModel() {
     private val coplanarityValidator = CoplanarityValidator(
         CoplanarityConfig(
             maxNormalAngleDegrees = 15.0,
@@ -37,7 +40,10 @@ class ArMeasureViewModel : ViewModel() {
     private val undoStack = ArrayDeque<MeasurementSnapshot>()
     private val redoStack = ArrayDeque<MeasurementSnapshot>()
 
-    private val _uiState = MutableStateFlow(ArMeasureUiState())
+    private val _uiState = MutableStateFlow(
+        MeasurementStateCodec.decode(savedStateHandle[KEY_MEASUREMENT_DRAFT])
+            ?: ArMeasureUiState()
+    )
     val uiState: StateFlow<ArMeasureUiState> = _uiState.asStateFlow()
 
     fun onAction(action: ArMeasureAction) {
@@ -63,6 +69,11 @@ class ArMeasureViewModel : ViewModel() {
             ArMeasureAction.SessionRestartHandled -> _uiState.value =
                 _uiState.value.copy(isSessionRestartRequested = false)
         }
+        persistMeasurementState()
+    }
+
+    fun persistMeasurementState() {
+        savedStateHandle[KEY_MEASUREMENT_DRAFT] = MeasurementStateCodec.encode(_uiState.value)
     }
 
     private fun updateReticle(sample: ReticleSample?) {
@@ -499,5 +510,6 @@ class ArMeasureViewModel : ViewModel() {
     private companion object {
         const val MAX_HISTORY_DEPTH = 50
         const val MIN_VERTEX_SEPARATION_METERS = 0.005
+        const val KEY_MEASUREMENT_DRAFT = "ar_measurement_draft"
     }
 }
