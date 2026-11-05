@@ -4,13 +4,13 @@
 
     <uses-permission android:name="android.permission.CAMERA" />
 
-    <!-- ARCore camera hardware declarations -->
+    <!-- AR measurement is optional; quote entry works on devices without ARCore. -->
     <uses-feature
         android:name="android.hardware.camera"
-        android:required="true" />
+        android:required="false" />
     <uses-feature
         android:name="android.hardware.camera.ar"
-        android:required="true" />
+        android:required="false" />
 
     <application
         android:name=".EstimatorApplication"
@@ -23,10 +23,10 @@
         android:supportsRtl="true"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
-        <!-- Google Play Services for AR (ARCore) required for metric spatial tracking -->
+        <!-- Google Play Services for AR (ARCore) is checked and installed at runtime. -->
         <meta-data
             android:name="com.google.ar.core"
-            android:value="required"
+            android:value="optional"
             tools:replace="android:value" />
 
         <activity

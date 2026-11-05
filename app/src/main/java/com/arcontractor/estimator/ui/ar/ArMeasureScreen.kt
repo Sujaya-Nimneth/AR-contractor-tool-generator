@@ -36,6 +36,7 @@ import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.arcontractor.estimator.spatial.tracking.ArReadiness
 import com.arcontractor.estimator.spatial.tracking.ArRecoveryAction
 import com.arcontractor.estimator.spatial.tracking.ArSessionController
 import com.arcontractor.estimator.spatial.tracking.PolygonSceneRenderer
@@ -45,6 +46,7 @@ import com.arcontractor.estimator.spatial.tracking.checkArReadiness
 import com.arcontractor.estimator.spatial.tracking.guidance
 import com.arcontractor.estimator.spatial.tracking.intent
 import com.arcontractor.estimator.spatial.tracking.recoveryAction
+import com.arcontractor.estimator.spatial.tracking.resolveArReadiness
 import com.arcontractor.estimator.spatial.tracking.toArSessionFailure
 import com.arcontractor.estimator.ui.quote.MeasurementCapture
 import com.google.ar.core.TrackingFailureReason
@@ -82,31 +84,43 @@ fun ArMeasureScreen(
     val sessionController = remember { ArSessionController() }
     var arSceneView by remember { mutableStateOf<ARSceneView?>(null) }
     var sessionGeneration by remember { mutableIntStateOf(0) }
-    var readiness by remember {
-        mutableStateOf<com.arcontractor.estimator.spatial.tracking.ArReadiness>(
-            context.checkArReadiness()
+    var readinessGuidance by remember {
+        mutableStateOf(context.checkArReadiness().guidance())
+    }
+    var depthEnabled by remember { mutableStateOf(true) }
+    var isResumed by remember {
+        mutableStateOf(
+            lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
         )
     }
-    var isResumed by remember { mutableStateOf(false) }
 
-    DisposableEffect(lifecycleOwner) {
+    DisposableEffect(lifecycleOwner, viewModel) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             isResumed = event == Lifecycle.Event.ON_RESUME
+            if (event == Lifecycle.Event.ON_STOP) {
+                viewModel.persistMeasurementState()
+            }
         }
         lifecycleOwner.lifecycle.addObserver(observer)
         onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
     }
+    LaunchedEffect(Unit) {
+        readinessGuidance = context.resolveArReadiness()
+    }
     LaunchedEffect(isResumed, state.isSessionRestartRequested) {
         if (isResumed) {
-            readiness = context.checkArReadiness()
+            readinessGuidance = context.checkArReadiness().guidance()
         }
         if (state.isSessionRestartRequested) {
             sessionGeneration += 1
             viewModel.onAction(ArMeasureAction.SessionRestartHandled)
         }
     }
-    val readinessGuidance = readiness.guidance()
-    val isArReady = readiness == com.arcontractor.estimator.spatial.tracking.ArReadiness.READY
+    val canMountArScene = readinessGuidance.readiness != ArReadiness.UNSUPPORTED_DEVICE &&
+        readinessGuidance.readiness != ArReadiness.INSTALLATION_UNAVAILABLE &&
+        state.sessionErrorMessage == null
+    val readiness = readinessGuidance.readiness
+    val isArReady = readiness == ArReadiness.READY
 
     val renderSnapshot = remember(
         state.outerVertices,
@@ -127,8 +141,8 @@ fun ArMeasureScreen(
         )
     }
 
-    LaunchedEffect(cameraStream, sessionController.isDepthEnabled) {
-        cameraStream.isDepthOcclusionEnabled = sessionController.isDepthEnabled
+    LaunchedEffect(cameraStream, depthEnabled) {
+        cameraStream.isDepthOcclusionEnabled = depthEnabled
     }
     LaunchedEffect(state.referencePose, state.surfaceBasis) {
         hitTester.setSurfaceLock(state.referencePose, state.surfaceBasis)
@@ -161,7 +175,7 @@ fun ArMeasureScreen(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        if (isArReady) {
+        if (canMountArScene) {
             androidx.compose.runtime.key(sessionGeneration) {
                 ARScene(
                     modifier = Modifier.fillMaxSize(),
@@ -172,8 +186,12 @@ fun ArMeasureScreen(
                     childNodes = nodes,
                     sessionConfiguration = { session, config ->
                         sessionController.applyTo(session, config)
-                        sessionController.depthStatusMessage?.let { message ->
-                            viewModel.onAction(ArMeasureAction.RenderFailed(message))
+                        val nextDepthEnabled = sessionController.isDepthEnabled
+                        if (depthEnabled != nextDepthEnabled) {
+                            depthEnabled = nextDepthEnabled
+                            sessionController.depthStatusMessage?.let { message ->
+                                viewModel.onAction(ArMeasureAction.RenderFailed(message))
+                            }
                         }
                     },
                     onSessionCreated = {
@@ -273,7 +291,12 @@ fun ArMeasureScreen(
                 } else {
                     state.canRetrySession
                 },
-                onRetrySession = { viewModel.onAction(ArMeasureAction.RetrySession) },
+                onRetrySession = {
+                    if (!isArReady) {
+                        readinessGuidance = context.resolveArReadiness(requestInstall = true)
+                    }
+                    viewModel.onAction(ArMeasureAction.RetrySession)
+                },
                 onBackToQuote = onBackToQuote,
                 openSettings = { action ->
                     action.intent(context)?.let(context::startActivity)
