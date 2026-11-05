@@ -3,6 +3,7 @@ package com.arcontractor.estimator.data.pdf
 import com.arcontractor.estimator.domain.estimation.QuoteLineCategory
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.LocalDateTime
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -17,12 +18,17 @@ class PdfQuoteFormatTest {
         assertEquals(first, second)
         assertTrue(first.matches(Regex("Q-\\d{8}-[0-9A-F]{6}")))
         assertEquals(
-            "quote-harbor-street-renovation-2026-10-31.pdf",
+            "quote-harbor-street-renovation-2026-10-31-000000.pdf",
             PdfQuoteFormat.fileName("Harbor Street / Renovation", date)
         )
         assertEquals(
-            "quote-contractor-quote-2026-10-31.pdf",
+            "quote-contractor-quote-2026-10-31-000000.pdf",
             PdfQuoteFormat.fileName("---", date)
+        )
+        val later = LocalDateTime.of(2026, 10, 31, 14, 32, 9)
+        assertTrue(
+            PdfQuoteFormat.fileName("Harbor Street / Renovation", date, later)
+                .endsWith("-143209.pdf")
         )
     }
 

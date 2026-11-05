@@ -18,6 +18,8 @@ import com.arcontractor.estimator.domain.geometry.CutoutPolygonInput
 import com.arcontractor.estimator.domain.geometry.PolygonGeometryEngine
 import com.arcontractor.estimator.domain.geometry.Vec3
 import java.io.File
+import java.math.BigDecimal
+import java.math.RoundingMode
 import java.time.Clock
 import java.time.Instant
 import java.time.ZoneOffset
@@ -58,6 +60,76 @@ class PdfQuoteGeneratorTest {
 
         assertTrue("Expected cover, blueprints, line items, and terms", a4Pages >= 7)
         assertEquals(a4Pages, letterPages)
+    }
+
+    @Test
+    fun `more than eight surfaces produce a complete paginated summary`() {
+        val workspace = fixtureWorkspace()
+        val extraSurfaces = (1..7).map { index ->
+            workspace.surfaces.first().copy(
+                surfaceId = "extra-$index",
+                surfaceName = "Additional surface $index"
+            )
+        }
+        val surfaces = workspace.surfaces + extraSurfaces
+        val quote = ProjectQuoteAggregator.aggregateProject(
+            projectName = workspace.project.name,
+            surfaces = surfaces.map { surface ->
+                ProjectSurfaceInput(
+                    surfaceId = surface.surfaceId,
+                    surfaceName = surface.surfaceName,
+                    geometry = requireNotNull(surface.analysis),
+                    materialSpec = surface.effectiveMaterial
+                )
+            },
+            taxRate = workspace.project.taxRate,
+            taxPolicy = TaxPolicy.TAX_TOTAL_SUBTOTAL
+        )
+        val reconciledSurfaces = surfaces.map { surface ->
+            surface.copy(
+                estimate = quote.surfaces.first {
+                    it.surfaceId == surface.surfaceId
+                }.estimate
+            )
+        }
+        val largeWorkspace = workspace.copy(
+            surfaces = reconciledSurfaces,
+            quote = quote
+        )
+        val generator = PdfQuoteGenerator(FIXED_CLOCK)
+        val options = PdfExportOptions(PdfPaperSize.A4)
+
+        val pageCount = generator.pageCount(largeWorkspace, options)
+
+        assertTrue(pageCount >= 13)
+        assertEquals(
+            quote.grandTotal,
+            reconciledSurfaces.mapNotNull(SurfaceQuoteLine::estimate)
+                .fold(BigDecimal.ZERO) { acc, estimate ->
+                    acc + estimate.grandTotal
+                }.setScale(2, RoundingMode.HALF_UP)
+        )
+        repeat(pageCount) { index ->
+            val bitmap = Bitmap.createBitmap(
+                options.paperSize.widthPoints * PREVIEW_SCALE,
+                options.paperSize.heightPoints * PREVIEW_SCALE,
+                Bitmap.Config.ARGB_8888
+            )
+            try {
+                val canvas = Canvas(bitmap)
+                canvas.drawColor(Color.WHITE)
+                canvas.scale(PREVIEW_SCALE.toFloat(), PREVIEW_SCALE.toFloat())
+                generator.renderPagePreview(
+                    workspace = largeWorkspace,
+                    options = options,
+                    pageNumber = index + 1,
+                    canvas = canvas
+                )
+                assertTrue(countNonWhiteSamples(bitmap) > MIN_NON_WHITE_SAMPLES)
+            } finally {
+                bitmap.recycle()
+            }
+        }
     }
 
     private fun renderPreviewSet(
