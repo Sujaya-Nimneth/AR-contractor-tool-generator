@@ -12,6 +12,9 @@ An offline-first Android app for measuring contractor surfaces in AR, estimating
 - Native A4 and US Letter vector PDF exports with contractor branding, hatched blueprints, dimension callouts, itemized pricing, terms, and a signature block.
 - Private, revisioned PDF storage exposed to the Android share sheet through a read-only `FileProvider`.
 - Deterministic project-level tax allocation, paginated surface summaries, and local data excluded from Android backups.
+- Optional ARCore declaration with runtime camera permission, installation prompts, depth fallback, and a manual-quote path on unsupported devices.
+- In-progress AR drafts restored from `SavedStateHandle`, with persistence limited to structural edits and lifecycle boundaries.
+- Collision-safe, millisecond-revisioned private PDF exports with bounded cleanup of older quote files.
 
 All geometry, persistence, estimation, and document generation run on-device. The app has no cloud data dependency.
 

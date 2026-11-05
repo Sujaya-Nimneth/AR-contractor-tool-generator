@@ -142,14 +142,14 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
 - [x] `data.pdf.PdfQuoteGenerator`: Multi-page A4/Letter `PdfDocument` layout with contractor branding header, client metadata, vector blueprint diagram, itemized materials/consumables/labor table, tax/total summary, validity date, and client signature block + Android `FileProvider` share sheet integration
 
 ### Phase 5: Final-Review Hardening *(Complete & Verified)*
-- [x] AR readiness checks, unsupported-device guidance, camera/settings recovery, and re-creatable session error states
+- [x] AR readiness checks, runtime camera permission/install handling, unsupported-device guidance, camera/settings recovery, and re-creatable session error states
 - [x] Runtime ARCore depth capability detection with plane-only fallback and depth-occlusion gating
 - [x] Locked-surface normal normalization for depth hits and recoverable tracking/session state transitions
 - [x] Deterministic project-level tax allocation so surface totals reconcile exactly with cover, itemized, and project totals
 - [x] Cent-normalized labor unit prices so displayed unit price × quantity equals the line total
 - [x] Complete paginated surface-summary pages for quotes with more than eight surfaces
 - [x] Revisioned private PDF filenames, bounded export cleanup, and explicit Android backup/data-extraction exclusions
-- [x] SavedStateHandle restoration of in-progress AR measurements and startup-only catalog seeding
+- [x] SavedStateHandle restoration of in-progress AR measurements with lifecycle-only persistence and startup-only catalog seeding
 - [x] Release/R8 verify, explicit serialization keep rules, zero lint warnings, and share-sheet string extraction
 
 ---
@@ -279,4 +279,6 @@ To prevent SceneView 1.x vs 2.x API drift, use these exact classes verified insi
 3. PDF surface summaries paginate every surface, exports use unique revisioned filenames, old private exports are pruned, and local quote data is excluded from Android backups.
 4. In-progress AR measurements survive process death through `SavedStateHandle`, and deleting the last catalog material no longer resurrects defaults on the next saved measurement.
 5. Debug and release assembly, JVM tests, instrumentation-test compilation, and Android lint complete successfully with zero lint issues.
+6. ARCore is declared optional so manual quote entry remains available on non-AR devices; installation is requested explicitly when Google Play Services for AR is missing or outdated.
+7. Private PDF exports include millisecond revisions and a collision-safe suffix so two exports in the same tick cannot overwrite the same share URI.
 
