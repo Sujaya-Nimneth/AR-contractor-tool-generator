@@ -280,4 +280,11 @@ internal object CurrencyMath {
         BigDecimal.valueOf(quantity)
             .multiply(BigDecimal.valueOf(rate))
             .setScale(2, RoundingMode.HALF_UP)
+
+    fun rate(amount: Double): BigDecimal = money(amount)
+
+    fun multiplyRate(quantity: Double, unitPrice: BigDecimal): BigDecimal =
+        BigDecimal.valueOf(quantity)
+            .multiply(unitPrice)
+            .setScale(2, RoundingMode.HALF_UP)
 }

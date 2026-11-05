@@ -31,7 +31,8 @@ object MaterialEstimationEngine {
         geometry: SurfaceGeometryMetrics,
         materialSpec: MaterialSpec,
         taxRate: Double = 0.0,
-        taxPolicy: TaxPolicy = TaxPolicy.TAX_TOTAL_SUBTOTAL
+        taxPolicy: TaxPolicy = TaxPolicy.TAX_TOTAL_SUBTOTAL,
+        taxAmountOverride: BigDecimal? = null
     ): SurfaceEstimate {
         require(taxRate in 0.0..1.0) { "taxRate must be in [0.0, 1.0], got $taxRate" }
 
@@ -103,7 +104,8 @@ object MaterialEstimationEngine {
             PricingAreaUnit.SQ_METER -> netArea
             PricingAreaUnit.SQ_FOOT -> UnitConverter.sqMetersToSqFeet(netArea)
         }
-        val laborSubtotal = CurrencyMath.multiplyRate(laborAreaInPricingUnit, materialSpec.laborRatePerUnitArea)
+        val laborUnitPrice = CurrencyMath.rate(materialSpec.laborRatePerUnitArea)
+        val laborSubtotal = CurrencyMath.multiplyRate(laborAreaInPricingUnit, laborUnitPrice)
 
         val subtotalBeforeTax = materialSubtotal
             .add(consumablesSubtotal)
@@ -116,8 +118,9 @@ object MaterialEstimationEngine {
                 materialSubtotal.add(consumablesSubtotal).setScale(2, RoundingMode.HALF_UP)
         }
 
-        val taxAmount = taxableBase
+        val taxAmount = (taxAmountOverride ?: taxableBase
             .multiply(BigDecimal.valueOf(taxRate))
+            .setScale(2, RoundingMode.HALF_UP))
             .setScale(2, RoundingMode.HALF_UP)
 
         val grandTotal = subtotalBeforeTax
@@ -131,7 +134,8 @@ object MaterialEstimationEngine {
             materialSubtotal = materialSubtotal,
             consumables = consumables,
             laborAreaInPricingUnit = laborAreaInPricingUnit,
-            laborSubtotal = laborSubtotal
+            laborSubtotal = laborSubtotal,
+            laborRatePerUnitArea = laborUnitPrice
         )
 
         return SurfaceEstimate(
@@ -447,7 +451,8 @@ object MaterialEstimationEngine {
         materialSubtotal: BigDecimal,
         consumables: List<ConsumableEstimate>,
         laborAreaInPricingUnit: Double,
-        laborSubtotal: BigDecimal
+        laborSubtotal: BigDecimal,
+        laborRatePerUnitArea: BigDecimal
     ): List<QuoteLineItem> {
         val items = ArrayList<QuoteLineItem>(consumables.size + 2)
 
@@ -498,7 +503,7 @@ object MaterialEstimationEngine {
                 ),
                 quantity = laborAreaInPricingUnit,
                 unitLabel = materialSpec.pricingAreaUnit.symbol,
-                unitPrice = CurrencyMath.money(materialSpec.laborRatePerUnitArea),
+                unitPrice = laborRatePerUnitArea,
                 lineTotal = laborSubtotal
             )
         )

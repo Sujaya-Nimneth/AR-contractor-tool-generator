@@ -52,15 +52,44 @@ object ProjectQuoteAggregator {
     ): ProjectQuoteSummary {
         require(taxRate in 0.0..1.0) { "taxRate must be in [0.0, 1.0], got $taxRate" }
 
-        val evaluated = surfaces.map { input ->
+        val pricedSurfaces = surfaces.map { input ->
             EvaluatedProjectSurface(
                 surfaceId = input.surfaceId,
                 surfaceName = input.surfaceName,
                 estimate = MaterialEstimationEngine.estimateSurface(
                     geometry = input.geometry,
                     materialSpec = input.materialSpec,
-                    taxRate = taxRate,
+                    taxRate = 0.0,
                     taxPolicy = taxPolicy
+                )
+            )
+        }
+
+        val taxableBases = pricedSurfaces.map { evaluated ->
+            taxableBase(evaluated.estimate, taxPolicy)
+        }
+        val projectTaxableBase = when (taxPolicy) {
+            TaxPolicy.TAX_TOTAL_SUBTOTAL -> pricedSurfaces.fold(BigDecimal.ZERO) { acc, s ->
+                acc + s.estimate.subtotalBeforeTax
+            }
+
+            TaxPolicy.TAX_MATERIALS_AND_CONSUMABLES_ONLY ->
+                pricedSurfaces.fold(BigDecimal.ZERO) { acc, s ->
+                    acc + s.estimate.materialSubtotal + s.estimate.consumablesSubtotal
+                }
+        }.setScale(2, RoundingMode.HALF_UP)
+        val taxAmount = projectTaxableBase
+            .multiply(BigDecimal.valueOf(taxRate))
+            .setScale(2, RoundingMode.HALF_UP)
+        val allocatedTax = allocateTax(taxableBases, taxAmount, taxRate)
+        val evaluated = pricedSurfaces.mapIndexed { index, evaluated ->
+            evaluated.copy(
+                estimate = evaluated.estimate.copy(
+                    taxRate = taxRate,
+                    taxAmount = allocatedTax[index],
+                    grandTotal = evaluated.estimate.subtotalBeforeTax
+                        .add(allocatedTax[index])
+                        .setScale(2, RoundingMode.HALF_UP)
                 )
             )
         }
@@ -78,11 +107,6 @@ object ProjectQuoteAggregator {
 
         val subtotal = matSub.add(consSub).add(labSub).setScale(2, RoundingMode.HALF_UP)
 
-        val taxableBase = when (taxPolicy) {
-            TaxPolicy.TAX_TOTAL_SUBTOTAL -> subtotal
-            TaxPolicy.TAX_MATERIALS_AND_CONSUMABLES_ONLY -> matSub.add(consSub).setScale(2, RoundingMode.HALF_UP)
-        }
-        val taxAmount = taxableBase.multiply(BigDecimal.valueOf(taxRate)).setScale(2, RoundingMode.HALF_UP)
         val grandTotal = subtotal.add(taxAmount).setScale(2, RoundingMode.HALF_UP)
 
         return ProjectQuoteSummary(
@@ -100,6 +124,41 @@ object ProjectQuoteAggregator {
             taxAmount = taxAmount,
             grandTotal = grandTotal
         )
+    }
+
+    private fun taxableBase(estimate: SurfaceEstimate, taxPolicy: TaxPolicy): BigDecimal =
+        when (taxPolicy) {
+            TaxPolicy.TAX_TOTAL_SUBTOTAL -> estimate.subtotalBeforeTax
+            TaxPolicy.TAX_MATERIALS_AND_CONSUMABLES_ONLY ->
+                estimate.materialSubtotal.add(estimate.consumablesSubtotal)
+        }.setScale(2, RoundingMode.HALF_UP)
+
+    private fun allocateTax(
+        bases: List<BigDecimal>,
+        targetCents: BigDecimal,
+        taxRate: Double
+    ): List<BigDecimal> {
+        if (bases.isEmpty()) return emptyList()
+        val rate = BigDecimal.valueOf(taxRate)
+        val exact = bases.map { it.multiply(rate) }
+        val floors = exact.map { it.setScale(2, RoundingMode.DOWN) }
+        val target = targetCents.movePointRight(2).toInt()
+        val floorTotal = floors.sumOf {
+            it.movePointRight(2).toInt()
+        }
+        val remainder = (target - floorTotal).coerceAtLeast(0)
+        val order = exact.indices.sortedWith(
+            compareByDescending<Int> { index ->
+                exact[index].minus(floors[index])
+            }.thenBy { it }
+        )
+        val cents = floors.map {
+            it.movePointRight(2).toInt()
+        }.toMutableList()
+        repeat(remainder.coerceAtMost(cents.size)) { offset ->
+            cents[order[offset]] += 1
+        }
+        return cents.map { BigDecimal.valueOf(it.toLong(), 2) }
     }
 }
 
