@@ -91,30 +91,29 @@ class RoomProjectRepository(
                     taxPolicy = taxPolicy
                 )
             }
-            val quoteInputs = surfaces.mapNotNull { surface ->
-                val analysis = surface.analysis ?: return@mapNotNull null
-                val estimate = surface.estimate ?: return@mapNotNull null
-                if (estimate.netAreaSqMeters <= 0.0 && analysis.grossAreaSqMeters <= 0.0) {
-                    return@mapNotNull null
-                }
-                ProjectSurfaceInput(
-                    surfaceId = surface.surfaceId,
-                    surfaceName = surface.surfaceName,
-                    geometry = analysis,
-                    materialSpec = surface.effectiveMaterial
-                )
-            }
+            val quoteInputs = surfaces.mapNotNull(::quoteInput)
 
+            val quote = ProjectQuoteAggregator.aggregateProject(
+                projectName = project.name,
+                surfaces = quoteInputs,
+                taxRate = taxRate,
+                taxPolicy = taxPolicy
+            )
+            val reconciledSurfaces = surfaces.map { surface ->
+                val projectEstimate = quote.surfaces.firstOrNull {
+                    it.surfaceId == surface.surfaceId
+                }?.estimate
+                if (projectEstimate != null) {
+                    surface.copy(estimate = projectEstimate)
+                } else {
+                    surface
+                }
+            }
             ProjectWorkspace(
                 project = project,
                 materials = materials,
-                surfaces = surfaces,
-                quote = ProjectQuoteAggregator.aggregateProject(
-                    projectName = project.name,
-                    surfaces = quoteInputs,
-                    taxRate = taxRate,
-                    taxPolicy = taxPolicy
-                ),
+                surfaces = reconciledSurfaces,
+                quote = quote,
                 loadErrors = loadErrors
             )
         }
@@ -304,7 +303,7 @@ class RoomProjectRepository(
                 estimate = MaterialEstimationEngine.estimateSurface(
                     geometry = analysis,
                     materialSpec = effectiveMaterial,
-                    taxRate = taxRate,
+                    taxRate = 0.0,
                     taxPolicy = taxPolicy
                 )
             )
@@ -374,6 +373,20 @@ class RoomProjectRepository(
             wastePreset = wastePreset,
             customWasteFactor = customWasteFactorOverride ?: material.customWasteFactor,
             laborRatePerUnitArea = laborRateOverride ?: material.laborRatePerUnitArea
+        )
+    }
+
+    private fun quoteInput(surface: SurfaceQuoteLine): ProjectSurfaceInput? {
+        val analysis = surface.analysis ?: return null
+        val estimate = surface.estimate ?: return null
+        if (estimate.netAreaSqMeters <= 0.0 && analysis.grossAreaSqMeters <= 0.0) {
+            return null
+        }
+        return ProjectSurfaceInput(
+            surfaceId = surface.surfaceId,
+            surfaceName = surface.surfaceName,
+            geometry = analysis,
+            materialSpec = surface.effectiveMaterial
         )
     }
 
