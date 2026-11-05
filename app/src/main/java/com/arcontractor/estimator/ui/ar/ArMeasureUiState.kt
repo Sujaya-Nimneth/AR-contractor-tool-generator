@@ -8,6 +8,7 @@ import com.arcontractor.estimator.domain.geometry.PlanarProjectionResult
 import com.arcontractor.estimator.domain.geometry.Pose3D
 import com.arcontractor.estimator.domain.geometry.Vec3
 import com.arcontractor.estimator.spatial.tracking.ReticleSample
+import com.arcontractor.estimator.spatial.tracking.ArRecoveryAction
 
 /**
  * Unidirectional measurement workflow states defined by the Phase 2 contract.
@@ -28,6 +29,9 @@ data class ArMeasureUiState(
     val isTracking: Boolean = true,
     val trackingFailureMessage: String? = null,
     val sessionErrorMessage: String? = null,
+    val sessionRecoveryAction: ArRecoveryAction? = null,
+    val canRetrySession: Boolean = false,
+    val isSessionRestartRequested: Boolean = false,
     val reticleSample: ReticleSample? = null,
     val referencePose: Pose3D? = null,
     val surfaceBasis: PlanarBasis? = null,
@@ -123,6 +127,11 @@ sealed interface ArMeasureAction {
     ) : ArMeasureAction
 
     data class SessionFailed(val message: String) : ArMeasureAction
+    data class SessionIssue(
+        val message: String,
+        val recoveryAction: ArRecoveryAction,
+        val canRetrySession: Boolean
+    ) : ArMeasureAction
     data class RenderFailed(val message: String) : ArMeasureAction
     data class SelectCutoutKind(val kind: CutoutKind) : ArMeasureAction
 
@@ -135,4 +144,6 @@ sealed interface ArMeasureAction {
     data object Redo : ArMeasureAction
     data object Reset : ArMeasureAction
     data object ClearMessage : ArMeasureAction
+    data object RetrySession : ArMeasureAction
+    data object SessionRestartHandled : ArMeasureAction
 }

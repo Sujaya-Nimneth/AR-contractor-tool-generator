@@ -9,10 +9,12 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -25,13 +27,24 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.layout.Spacer
+import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.viewmodel.compose.viewModel
+import com.arcontractor.estimator.spatial.tracking.ArRecoveryAction
 import com.arcontractor.estimator.spatial.tracking.ArSessionController
 import com.arcontractor.estimator.spatial.tracking.PolygonSceneRenderer
 import com.arcontractor.estimator.spatial.tracking.ReticleHitTester
 import com.arcontractor.estimator.spatial.tracking.SurfaceRenderSnapshot
+import com.arcontractor.estimator.spatial.tracking.checkArReadiness
+import com.arcontractor.estimator.spatial.tracking.guidance
+import com.arcontractor.estimator.spatial.tracking.intent
+import com.arcontractor.estimator.spatial.tracking.recoveryAction
+import com.arcontractor.estimator.spatial.tracking.toArSessionFailure
 import com.arcontractor.estimator.ui.quote.MeasurementCapture
 import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
@@ -54,6 +67,8 @@ fun ArMeasureScreen(
     onSaveMeasurement: (MeasurementCapture) -> Unit = {},
     onBackToQuote: () -> Unit = {}
 ) {
+    val context = LocalContext.current
+    val lifecycleOwner = LocalLifecycleOwner.current
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val engine = rememberEngine()
     val materialLoader = rememberMaterialLoader(engine)
@@ -65,6 +80,32 @@ fun ArMeasureScreen(
     val hitTester = remember { ReticleHitTester() }
     val sessionController = remember { ArSessionController() }
     var arSceneView by remember { mutableStateOf<ARSceneView?>(null) }
+    var sessionGeneration by remember { mutableStateOf(0) }
+    var readiness by remember {
+        mutableStateOf<com.arcontractor.estimator.spatial.tracking.ArReadiness>(
+            context.checkArReadiness()
+        )
+    }
+    var isResumed by remember { mutableStateOf(false) }
+
+    DisposableEffect(lifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            isResumed = event == Lifecycle.Event.ON_RESUME
+        }
+        lifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { lifecycleOwner.lifecycle.removeObserver(observer) }
+    }
+    LaunchedEffect(isResumed, state.isSessionRestartRequested) {
+        if (isResumed) {
+            readiness = context.checkArReadiness()
+        }
+        if (state.isSessionRestartRequested) {
+            sessionGeneration += 1
+            viewModel.onAction(ArMeasureAction.SessionRestartHandled)
+        }
+    }
+    val readinessGuidance = readiness.guidance()
+    val isArReady = readiness == com.arcontractor.estimator.spatial.tracking.ArReadiness.READY
 
     val renderSnapshot = remember(
         state.outerVertices,
@@ -85,8 +126,8 @@ fun ArMeasureScreen(
         )
     }
 
-    LaunchedEffect(cameraStream) {
-        cameraStream.isDepthOcclusionEnabled = true
+    LaunchedEffect(cameraStream, sessionController.isDepthEnabled) {
+        cameraStream.isDepthOcclusionEnabled = sessionController.isDepthEnabled
     }
     LaunchedEffect(state.referencePose, state.surfaceBasis) {
         hitTester.setSurfaceLock(state.referencePose, state.surfaceBasis)
@@ -119,75 +160,85 @@ fun ArMeasureScreen(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        ARScene(
-            modifier = Modifier.fillMaxSize(),
-            engine = engine,
-            materialLoader = materialLoader,
-            cameraStream = cameraStream,
-            planeRenderer = true,
-            childNodes = nodes,
-            sessionConfiguration = { _, config ->
-                sessionController.applyTo(config)
-            },
-            onSessionCreated = {
-                viewModel.onAction(ArMeasureAction.TrackingChanged(true))
-            },
-            onSessionResumed = {
-                viewModel.onAction(ArMeasureAction.TrackingChanged(true))
-            },
-            onSessionPaused = {
-                hitTester.onTrackingLost()
-                viewModel.onAction(
-                    ArMeasureAction.TrackingChanged(
-                        isTracking = false,
-                        failureMessage = "AR session paused. Resume the camera to continue."
-                    )
-                )
-            },
-            onSessionFailed = { exception ->
-                viewModel.onAction(
-                    ArMeasureAction.SessionFailed(
-                        exception.message ?: "ARCore could not start on this device."
-                    )
-                )
-            },
-            onSessionUpdated = { _, frame ->
-                val camera = frame.camera
-                if (camera.trackingState == TrackingState.TRACKING) {
-                    viewModel.onAction(ArMeasureAction.TrackingChanged(true))
-                    val sample = arSceneView?.let { view ->
-                        hitTester.sample(
-                            frame = frame,
-                            viewportWidthPx = view.width,
-                            viewportHeightPx = view.height
+        if (isArReady) {
+            androidx.compose.runtime.key(sessionGeneration) {
+                ARScene(
+                    modifier = Modifier.fillMaxSize(),
+                    engine = engine,
+                    materialLoader = materialLoader,
+                    cameraStream = cameraStream,
+                    planeRenderer = true,
+                    childNodes = nodes,
+                    sessionConfiguration = { session, config ->
+                        sessionController.applyTo(session, config)
+                        sessionController.depthStatusMessage?.let { message ->
+                            viewModel.onAction(ArMeasureAction.RenderFailed(message))
+                        }
+                    },
+                    onSessionCreated = {
+                        viewModel.onAction(ArMeasureAction.TrackingChanged(true))
+                    },
+                    onSessionResumed = {
+                        viewModel.onAction(ArMeasureAction.TrackingChanged(true))
+                    },
+                    onSessionPaused = {
+                        hitTester.onTrackingLost()
+                        viewModel.onAction(
+                            ArMeasureAction.TrackingChanged(
+                                isTracking = false,
+                                failureMessage = "AR session paused. Resume the camera to continue."
+                            )
                         )
+                    },
+                    onSessionFailed = { exception ->
+                        val failure = exception.toArSessionFailure(context)
+                        viewModel.onAction(
+                            ArMeasureAction.SessionIssue(
+                                message = failure.message,
+                                recoveryAction = failure.kind.recoveryAction(),
+                                canRetrySession = failure.canRetrySession
+                            )
+                        )
+                    },
+                    onSessionUpdated = { _, frame ->
+                        val camera = frame.camera
+                        if (camera.trackingState == TrackingState.TRACKING) {
+                            viewModel.onAction(ArMeasureAction.TrackingChanged(true))
+                            val sample = arSceneView?.let { view ->
+                                hitTester.sample(
+                                    frame = frame,
+                                    viewportWidthPx = view.width,
+                                    viewportHeightPx = view.height
+                                )
+                            }
+                            viewModel.onAction(ArMeasureAction.ReticleUpdated(sample))
+                        } else {
+                            hitTester.onTrackingLost()
+                            viewModel.onAction(
+                                ArMeasureAction.TrackingChanged(
+                                    isTracking = false,
+                                    failureMessage = camera.trackingFailureReason.userMessage()
+                                )
+                            )
+                            viewModel.onAction(ArMeasureAction.ReticleUpdated(null))
+                        }
+                    },
+                    onTrackingFailureChanged = { reason ->
+                        if (reason != null && reason != TrackingFailureReason.NONE) {
+                            viewModel.onAction(
+                                ArMeasureAction.TrackingChanged(
+                                    isTracking = false,
+                                    failureMessage = reason.userMessage()
+                                )
+                            )
+                        }
+                    },
+                    onViewCreated = {
+                        arSceneView = this
                     }
-                    viewModel.onAction(ArMeasureAction.ReticleUpdated(sample))
-                } else {
-                    hitTester.onTrackingLost()
-                    viewModel.onAction(
-                        ArMeasureAction.TrackingChanged(
-                            isTracking = false,
-                            failureMessage = camera.trackingFailureReason.userMessage()
-                        )
-                    )
-                    viewModel.onAction(ArMeasureAction.ReticleUpdated(null))
-                }
-            },
-            onTrackingFailureChanged = { reason ->
-                if (reason != null && reason != TrackingFailureReason.NONE) {
-                    viewModel.onAction(
-                        ArMeasureAction.TrackingChanged(
-                            isTracking = false,
-                            failureMessage = reason.userMessage()
-                        )
-                    )
-                }
-            },
-            onViewCreated = {
-                arSceneView = this
+                )
             }
-        )
+        }
 
         Column(modifier = Modifier.align(Alignment.TopCenter)) {
             MeasurementTopHud(
@@ -205,6 +256,31 @@ fun ArMeasureScreen(
                         ?: "Tracking is unavailable. Move the device slowly across the surface."
                 )
             }
+        }
+
+        if (!isArReady || state.sessionErrorMessage != null) {
+            ArRecoveryCard(
+                title = if (!isArReady) "AR not ready" else "AR session needs attention",
+                message = if (!isArReady) readinessGuidance.message else state.sessionErrorMessage.orEmpty(),
+                recoveryAction = if (!isArReady) {
+                    readinessGuidance.recoveryAction
+                } else {
+                    state.sessionRecoveryAction ?: ArRecoveryAction.RETRY
+                },
+                canRetrySession = if (!isArReady) {
+                    readinessGuidance.recoveryAction == ArRecoveryAction.RETRY
+                } else {
+                    state.canRetrySession
+                },
+                onRetrySession = { viewModel.onAction(ArMeasureAction.RetrySession) },
+                onBackToQuote = onBackToQuote,
+                openSettings = { action ->
+                    action.intent(context)?.let(context::startActivity)
+                },
+                modifier = Modifier
+                    .align(Alignment.Center)
+                    .padding(horizontal = 22.dp)
+            )
         }
 
         AnimatedVisibility(
@@ -242,6 +318,65 @@ fun ArMeasureScreen(
                     )
                 }
             )
+        }
+    }
+}
+
+@Composable
+private fun ArRecoveryCard(
+    title: String,
+    message: String,
+    recoveryAction: ArRecoveryAction,
+    canRetrySession: Boolean,
+    onRetrySession: () -> Unit,
+    onBackToQuote: () -> Unit,
+    openSettings: (ArRecoveryAction) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Surface(
+        modifier = modifier,
+        shape = RoundedCornerShape(20.dp),
+        color = Color(0xF01A1715),
+        border = androidx.compose.foundation.BorderStroke(1.dp, Color(0xFFFFB547).copy(alpha = 0.7f))
+    ) {
+        Column(modifier = Modifier.padding(20.dp)) {
+            Text(
+                text = title,
+                color = Color.White,
+                style = MaterialTheme.typography.titleMedium,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(Modifier.height(8.dp))
+            Text(
+                text = message,
+                color = Color.White.copy(alpha = 0.82f),
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Spacer(Modifier.height(16.dp))
+            if (canRetrySession) {
+                OutlinedButton(
+                    onClick = onRetrySession,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("RETRY AR SESSION")
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            if (recoveryAction == ArRecoveryAction.OPEN_CAMERA_SETTINGS) {
+                OutlinedButton(
+                    onClick = { openSettings(recoveryAction) },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("OPEN CAMERA SETTINGS")
+                }
+                Spacer(Modifier.height(8.dp))
+            }
+            OutlinedButton(
+                onClick = onBackToQuote,
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text("BACK TO QUOTE")
+            }
         }
     }
 }

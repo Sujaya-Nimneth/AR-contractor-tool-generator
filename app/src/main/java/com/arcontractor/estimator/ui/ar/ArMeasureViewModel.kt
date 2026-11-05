@@ -15,6 +15,7 @@ import com.arcontractor.estimator.domain.geometry.PolygonGeometryEngine
 import com.arcontractor.estimator.domain.geometry.Pose3D
 import com.arcontractor.estimator.domain.geometry.Vec3
 import com.arcontractor.estimator.spatial.tracking.ReticleSample
+import com.arcontractor.estimator.spatial.tracking.ArRecoveryAction
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -44,6 +45,7 @@ class ArMeasureViewModel : ViewModel() {
             is ArMeasureAction.ReticleUpdated -> updateReticle(action.sample)
             is ArMeasureAction.TrackingChanged -> updateTracking(action)
             is ArMeasureAction.SessionFailed -> showSessionError(action.message)
+            is ArMeasureAction.SessionIssue -> showSessionIssue(action)
             is ArMeasureAction.RenderFailed -> _uiState.value =
                 _uiState.value.copy(message = action.message)
 
@@ -57,6 +59,9 @@ class ArMeasureViewModel : ViewModel() {
             ArMeasureAction.Redo -> redo()
             ArMeasureAction.Reset -> reset()
             ArMeasureAction.ClearMessage -> _uiState.value = _uiState.value.copy(message = null)
+            ArMeasureAction.RetrySession -> retrySession()
+            ArMeasureAction.SessionRestartHandled -> _uiState.value =
+                _uiState.value.copy(isSessionRestartRequested = false)
         }
     }
 
@@ -78,6 +83,7 @@ class ArMeasureViewModel : ViewModel() {
 
     private fun updateTracking(action: ArMeasureAction.TrackingChanged) {
         val current = _uiState.value
+        val recovered = action.isTracking && current.sessionErrorMessage != null
         val nextPhase = if (!action.isTracking &&
             current.outerVertices.isEmpty() &&
             current.phase in setOf(ArMeasurePhase.SCANNING, ArMeasurePhase.LOCKING_PLANE)
@@ -90,7 +96,10 @@ class ArMeasureViewModel : ViewModel() {
             phase = nextPhase,
             isTracking = action.isTracking,
             trackingFailureMessage = action.failureMessage,
-            reticleSample = if (action.isTracking) current.reticleSample else null
+            reticleSample = if (action.isTracking) current.reticleSample else null,
+            sessionErrorMessage = if (recovered) null else current.sessionErrorMessage,
+            sessionRecoveryAction = if (recovered) null else current.sessionRecoveryAction,
+            canRetrySession = if (recovered) false else current.canRetrySession
         )
     }
 
@@ -99,7 +108,35 @@ class ArMeasureViewModel : ViewModel() {
             isTracking = false,
             reticleSample = null,
             sessionErrorMessage = message,
+            sessionRecoveryAction = ArRecoveryAction.RETRY,
+            canRetrySession = true,
             message = message
+        )
+    }
+
+    private fun showSessionIssue(action: ArMeasureAction.SessionIssue) {
+        _uiState.value = _uiState.value.copy(
+            isTracking = false,
+            reticleSample = null,
+            sessionErrorMessage = action.message,
+            sessionRecoveryAction = action.recoveryAction,
+            canRetrySession = action.canRetrySession,
+            message = action.message
+        )
+    }
+
+    private fun retrySession() {
+        val current = _uiState.value
+        if (!current.canRetrySession) return
+        _uiState.value = current.copy(
+            isTracking = false,
+            trackingFailureMessage = null,
+            sessionErrorMessage = null,
+            sessionRecoveryAction = null,
+            canRetrySession = false,
+            isSessionRestartRequested = true,
+            reticleSample = null,
+            message = "Restarting AR session..."
         )
     }
 
@@ -310,8 +347,7 @@ class ArMeasureViewModel : ViewModel() {
         val current = _uiState.value
         _uiState.value = ArMeasureUiState(
             isTracking = current.isTracking,
-            trackingFailureMessage = current.trackingFailureMessage,
-            sessionErrorMessage = current.sessionErrorMessage
+            trackingFailureMessage = current.trackingFailureMessage
         )
     }
 
@@ -402,7 +438,9 @@ class ArMeasureViewModel : ViewModel() {
             phase = snapshot.phase,
             isTracking = previous.isTracking,
             trackingFailureMessage = previous.trackingFailureMessage,
-            sessionErrorMessage = previous.sessionErrorMessage,
+            sessionErrorMessage = null,
+            sessionRecoveryAction = null,
+            canRetrySession = false,
             reticleSample = previous.reticleSample,
             referencePose = snapshot.referencePose,
             surfaceBasis = snapshot.surfaceBasis,
