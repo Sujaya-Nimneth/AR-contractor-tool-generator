@@ -130,6 +130,18 @@ class RepositoryTest {
             .multiply(BigDecimal.valueOf(0.10))
             .setScale(2, RoundingMode.HALF_UP)
         assertEquals(expectedTaxable, updated.quote.taxAmount)
+        assertEquals(
+            updated.quote.taxAmount,
+            updated.surfaces.mapNotNull(SurfaceQuoteLine::estimate)
+                .fold(BigDecimal.ZERO) { acc, estimate -> acc + estimate.taxAmount }
+                .setScale(2, RoundingMode.HALF_UP)
+        )
+        assertEquals(
+            updated.quote.grandTotal,
+            updated.surfaces.mapNotNull(SurfaceQuoteLine::estimate)
+                .fold(BigDecimal.ZERO) { acc, estimate -> acc + estimate.grandTotal }
+                .setScale(2, RoundingMode.HALF_UP)
+        )
         assertTrue(updated.quote.taxAmount < updated.quote.subtotalBeforeTax
             .multiply(BigDecimal.valueOf(0.10))
             .setScale(2, RoundingMode.HALF_UP))

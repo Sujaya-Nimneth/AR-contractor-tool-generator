@@ -228,5 +228,96 @@ class MaterialEstimationEngineTest {
             summary.materialSubtotal.add(summary.consumablesSubtotal).add(summary.laborSubtotal),
             summary.subtotalBeforeTax
         )
+        assertEquals(
+            summary.grandTotal,
+            summary.surfaces.fold(BigDecimal.ZERO) { acc, surface ->
+                acc + surface.estimate.grandTotal
+            }.setScale(2, java.math.RoundingMode.HALF_UP)
+        )
+    }
+
+    @Test
+    fun `project tax allocation reconciles penny rounding for both tax policies`() {
+        listOf(
+            TaxPolicy.TAX_TOTAL_SUBTOTAL,
+            TaxPolicy.TAX_MATERIALS_AND_CONSUMABLES_ONLY
+        ).forEach { policy ->
+            val geometry = listOf(0.01, 0.06, 0.13).map { netArea ->
+                BasicSurfaceGeometry(
+                    grossAreaSqMeters = netArea,
+                    netAreaSqMeters = netArea,
+                    outerPerimeterMeters = 0.4,
+                    cutoutPerimeterMeters = 0.0
+                )
+            }
+            val spec = DefaultMaterialCatalog.acrylicEggshellInteriorPaint.copy(
+                boxCoverageSqMeters = 1_000.0,
+                unitCost = 0.01,
+                laborRatePerUnitArea = 0.0,
+                tradeParameters = TradeParameters.Painting(
+                    finishCoatCount = 1,
+                    primerCoatCount = 0,
+                    includePaintersTape = false
+                )
+            )
+            val summary = ProjectQuoteAggregator.aggregateProject(
+                projectName = "Penny reconciliation",
+                surfaces = geometry.mapIndexed { index, surface ->
+                    ProjectSurfaceInput(
+                        surfaceId = "s$index",
+                        surfaceName = "Surface $index",
+                        geometry = surface,
+                        materialSpec = spec
+                    )
+                },
+                taxRate = 0.0825,
+                taxPolicy = policy
+            )
+
+            assertEquals(
+                summary.taxAmount,
+                summary.surfaces.fold(BigDecimal.ZERO) { acc, surface ->
+                    acc + surface.estimate.taxAmount
+                }.setScale(2, java.math.RoundingMode.HALF_UP)
+            )
+            assertEquals(
+                summary.grandTotal,
+                summary.surfaces.fold(BigDecimal.ZERO) { acc, surface ->
+                    acc + surface.estimate.grandTotal
+                }.setScale(2, java.math.RoundingMode.HALF_UP)
+            )
+        }
+    }
+
+    @Test
+    fun `displayed labor unit price is the rate used for the line total`() {
+        val geometry = BasicSurfaceGeometry(
+            grossAreaSqMeters = 2.0,
+            netAreaSqMeters = 2.0,
+            outerPerimeterMeters = 6.0
+        )
+        val spec = DefaultMaterialCatalog.acrylicEggshellInteriorPaint.copy(
+            boxCoverageSqMeters = 1_000.0,
+            unitCost = 0.0,
+            laborRatePerUnitArea = 12.345,
+            tradeParameters = TradeParameters.Painting(
+                finishCoatCount = 1,
+                primerCoatCount = 0,
+                includePaintersTape = false
+            )
+        )
+
+        val estimate = MaterialEstimationEngine.estimateSurface(geometry, spec)
+        val laborLine = estimate.lineItems.single {
+            it.category == QuoteLineCategory.LABOR
+        }
+
+        assertEquals(BigDecimal("12.35"), laborLine.unitPrice)
+        assertEquals(
+            BigDecimal.valueOf(laborLine.quantity)
+                .multiply(laborLine.unitPrice)
+                .setScale(2, java.math.RoundingMode.HALF_UP),
+            laborLine.lineTotal
+        )
     }
 }
