@@ -3,6 +3,7 @@ package com.arcontractor.estimator.ui.ar
 import com.arcontractor.estimator.domain.geometry.CutoutKind
 import com.arcontractor.estimator.domain.geometry.Pose3D
 import com.arcontractor.estimator.domain.geometry.Vec3
+import com.arcontractor.estimator.spatial.tracking.ArRecoveryAction
 import com.arcontractor.estimator.spatial.tracking.ReticleSample
 import com.arcontractor.estimator.spatial.tracking.SurfaceHitSource
 import org.junit.Assert.assertEquals
@@ -138,6 +139,62 @@ class ArMeasureViewModelTest {
         assertNull(state.surfaceAnalysis)
         assertFalse(state.canUndo)
         assertFalse(state.canRedo)
+    }
+
+    @Test
+    fun `successful tracking clears a stale session error`() {
+        val viewModel = ArMeasureViewModel()
+        viewModel.onAction(
+            ArMeasureAction.SessionIssue(
+                message = "ARCore could not start.",
+                recoveryAction = ArRecoveryAction.RETRY,
+                canRetrySession = true
+            )
+        )
+        assertNotNull(viewModel.uiState.value.sessionErrorMessage)
+
+        viewModel.onAction(ArMeasureAction.TrackingChanged(true))
+
+        val recovered = viewModel.uiState.value
+        assertNull(recovered.sessionErrorMessage)
+        assertNull(recovered.sessionRecoveryAction)
+        assertFalse(recovered.canRetrySession)
+        assertTrue(recovered.isTracking)
+    }
+
+    @Test
+    fun `retry clears the session error and requests a fresh AR view`() {
+        val viewModel = ArMeasureViewModel()
+        viewModel.onAction(ArMeasureAction.SessionFailed("Camera unavailable"))
+
+        viewModel.onAction(ArMeasureAction.RetrySession)
+
+        val retrying = viewModel.uiState.value
+        assertNull(retrying.sessionErrorMessage)
+        assertFalse(retrying.canRetrySession)
+        assertTrue(retrying.isSessionRestartRequested)
+
+        viewModel.onAction(ArMeasureAction.SessionRestartHandled)
+        assertFalse(viewModel.uiState.value.isSessionRestartRequested)
+    }
+
+    @Test
+    fun `reset clears terminal session state`() {
+        val viewModel = ArMeasureViewModel()
+        viewModel.onAction(
+            ArMeasureAction.SessionIssue(
+                message = "Unsupported device",
+                recoveryAction = ArRecoveryAction.BACK_TO_QUOTE,
+                canRetrySession = false
+            )
+        )
+
+        viewModel.onAction(ArMeasureAction.Reset)
+
+        val state = viewModel.uiState.value
+        assertNull(state.sessionErrorMessage)
+        assertNull(state.sessionRecoveryAction)
+        assertFalse(state.canRetrySession)
     }
 
     private fun squareSurfaceViewModel(): ArMeasureViewModel {
