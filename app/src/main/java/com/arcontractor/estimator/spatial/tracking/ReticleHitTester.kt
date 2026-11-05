@@ -37,6 +37,7 @@ class ReticleHitTester(
 ) {
     private var lockedReferencePose: Pose3D? = null
     private var lockedBasis: PlanarBasis? = null
+    private var lockedSurfaceNormal: Vec3? = null
 
     /**
      * Locks subsequent samples to the first placed vertex. Once three or more vertices exist, the
@@ -45,6 +46,7 @@ class ReticleHitTester(
     fun setSurfaceLock(referencePose: Pose3D?, basis: PlanarBasis?) {
         lockedReferencePose = referencePose
         lockedBasis = basis
+        lockedSurfaceNormal = basis?.normal ?: referencePose?.normal
         if (referencePose == null && basis == null) {
             poseFilter.reset()
         }
@@ -79,11 +81,12 @@ class ReticleHitTester(
             return null
         }
 
-        val filtered = poseFilter.update(selected.pose)
+        val normalizedCandidate = selected.withLockedNormal(lockedSurfaceNormal)
+        val filtered = poseFilter.update(normalizedCandidate)
         val smoothedPose = filtered.smoothedPose
         val coplanarity = validateAgainstLock(smoothedPose)
         return ReticleSample(
-            rawPose = selected.pose,
+            rawPose = normalizedCandidate,
             pose = smoothedPose,
             source = selected.source,
             isStableForLock = filtered.isStableForLock,
@@ -93,16 +96,27 @@ class ReticleHitTester(
     }
 
     private fun validateAgainstLock(candidatePose: Pose3D): CoplanarityResult? {
+        val lockedNormal = lockedSurfaceNormal
         lockedBasis?.let { basis ->
             return coplanarityValidator.validateAgainstBasis(
                 basis = basis,
                 candidatePosition = candidatePose.position,
-                candidateNormal = candidatePose.normal
+                candidateNormal = lockedNormal ?: candidatePose.normal
             )
         }
         val reference = lockedReferencePose ?: return null
-        return coplanarityValidator.validatePose(reference, candidatePose)
+        return coplanarityValidator.validatePose(
+            reference,
+            candidatePose.copy(normal = lockedNormal ?: candidatePose.normal)
+        )
     }
+
+    private fun SurfaceHitCandidate.withLockedNormal(lockedNormal: Vec3?): Pose3D =
+        if (source == SurfaceHitSource.PLANE || lockedNormal == null) {
+            pose
+        } else {
+            pose.copy(normal = lockedNormal)
+        }
 
     private fun HitResult.toCandidate(timestampNanos: Long): SurfaceHitCandidate? {
         if (trackable.trackingState != TrackingState.TRACKING) return null
