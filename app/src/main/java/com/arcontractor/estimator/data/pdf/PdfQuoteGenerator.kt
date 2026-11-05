@@ -117,8 +117,27 @@ class PdfQuoteGenerator(
         val tableRows = buildTableRows(workspace)
         val rowChunks = PdfQuoteFormat.chunkForPages(tableRows, ROWS_PER_TABLE_PAGE)
         val validSurfaces = workspace.surfaces.filter { it.analysis != null && it.estimate != null }
+        val surfaceChunks = PdfQuoteFormat.chunkForPages(
+            validSurfaces,
+            SURFACES_PER_SUMMARY_PAGE
+        )
         val pageSpecs = buildList {
-            add(PageSpec.Cover)
+            add(
+                PageSpec.Cover(
+                    surfaces = surfaceChunks.firstOrNull().orEmpty(),
+                    pageIndex = 1,
+                    pageCount = surfaceChunks.size
+                )
+            )
+            surfaceChunks.drop(1).forEachIndexed { index, surfaces ->
+                add(
+                    PageSpec.SurfaceSummary(
+                        surfaces = surfaces,
+                        pageIndex = index + 2,
+                        pageCount = surfaceChunks.size
+                    )
+                )
+            }
             validSurfaces.forEachIndexed { index, surface ->
                 add(PageSpec.Blueprint(surface, index + 1, validSurfaces.size))
             }
@@ -160,14 +179,15 @@ class PdfQuoteGenerator(
 
     private fun drawPage(context: PageContext, spec: PageSpec) {
         when (spec) {
-            PageSpec.Cover -> drawCover(context)
+            is PageSpec.Cover -> drawCover(context, spec)
+            is PageSpec.SurfaceSummary -> drawSurfaceSummaryPage(context, spec)
             is PageSpec.Blueprint -> drawBlueprintPage(context, spec)
             is PageSpec.LineItems -> drawLineItemsPage(context, spec)
             PageSpec.Terms -> drawTermsPage(context)
         }
     }
 
-    private fun drawCover(context: PageContext) {
+    private fun drawCover(context: PageContext, spec: PageSpec.Cover) {
         val canvas = context.canvas
         val width = context.width
         val margin = MARGIN
@@ -231,15 +251,49 @@ class PdfQuoteGenerator(
         )
         y += 146f
 
-        canvas.drawText("MEASURED SURFACES", margin, y, labelPaint(8.2f, INK))
+        val summaryTitle = if (spec.pageCount > 1) {
+            "MEASURED SURFACES  ·  SUMMARY ${spec.pageIndex}/${spec.pageCount}"
+        } else {
+            "MEASURED SURFACES"
+        }
+        canvas.drawText(summaryTitle, margin, y, labelPaint(8.2f, INK))
         y += 13f
         drawSurfaceSummaryTable(
             canvas = canvas,
-            surfaces = context.workspace.surfaces,
+            surfaces = spec.surfaces,
             left = margin,
             top = y,
             width = width - margin * 2f,
-            maxRows = 8
+            maxRows = SURFACES_PER_SUMMARY_PAGE
+        )
+    }
+
+    private fun drawSurfaceSummaryPage(
+        context: PageContext,
+        spec: PageSpec.SurfaceSummary
+    ) {
+        val canvas = context.canvas
+        drawDocumentHeader(context)
+        val y = 112f
+        canvas.drawText(
+            "MEASURED SURFACES  ·  SUMMARY ${spec.pageIndex}/${spec.pageCount}",
+            MARGIN,
+            y,
+            labelPaint(8.2f, INK)
+        )
+        canvas.drawText(
+            "All measured surface totals reconcile to the project total on the cover page.",
+            MARGIN,
+            y + 16f,
+            bodyPaint(8f, MUTED_INK)
+        )
+        drawSurfaceSummaryTable(
+            canvas = canvas,
+            surfaces = spec.surfaces,
+            left = MARGIN,
+            top = y + 30f,
+            width = context.width - MARGIN * 2f,
+            maxRows = SURFACES_PER_SUMMARY_PAGE
         )
     }
 
@@ -480,14 +534,8 @@ class PdfQuoteGenerator(
             canvas.drawLine(left, y + 5f, left + width, y + 5f, linePaint(0.45f, RULE))
         }
 
-        if (surfaces.size > maxRows) {
-            y += 20f
-            canvas.drawText(
-                "+ ${surfaces.size - maxRows} more surfaces on the following blueprint pages",
-                left,
-                y,
-                bodyPaint(7.2f, MUTED_INK)
-            )
+        check(surfaces.size <= maxRows) {
+            "Surface summary pages must not truncate more than $maxRows rows."
         }
     }
 
@@ -1076,7 +1124,17 @@ class PdfQuoteGenerator(
     )
 
     private sealed interface PageSpec {
-        data object Cover : PageSpec
+        data class Cover(
+            val surfaces: List<SurfaceQuoteLine>,
+            val pageIndex: Int,
+            val pageCount: Int
+        ) : PageSpec
+
+        data class SurfaceSummary(
+            val surfaces: List<SurfaceQuoteLine>,
+            val pageIndex: Int,
+            val pageCount: Int
+        ) : PageSpec
         data class Blueprint(
             val surface: SurfaceQuoteLine,
             val index: Int,
@@ -1095,6 +1153,7 @@ class PdfQuoteGenerator(
         const val MARGIN = 40f
         const val ROW_HEIGHT = 35f
         const val ROWS_PER_TABLE_PAGE = 12
+        const val SURFACES_PER_SUMMARY_PAGE = 8
 
         val INK: Int = Color.rgb(24, 27, 31)
         val MUTED_INK: Int = Color.rgb(88, 97, 109)
