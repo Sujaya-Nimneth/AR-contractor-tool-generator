@@ -46,6 +46,11 @@ class ArMeasureViewModel(
     )
     val uiState: StateFlow<ArMeasureUiState> = _uiState.asStateFlow()
 
+    override fun onCleared() {
+        persistMeasurementState()
+        super.onCleared()
+    }
+
     fun onAction(action: ArMeasureAction) {
         when (action) {
             is ArMeasureAction.ReticleUpdated -> updateReticle(action.sample)
@@ -69,7 +74,9 @@ class ArMeasureViewModel(
             ArMeasureAction.SessionRestartHandled -> _uiState.value =
                 _uiState.value.copy(isSessionRestartRequested = false)
         }
-        persistMeasurementState()
+        if (action.shouldPersistMeasurement()) {
+            persistMeasurementState()
+        }
     }
 
     fun persistMeasurementState() {
@@ -494,6 +501,15 @@ class ArMeasureViewModel(
         vertices.lastOrNull()?.distanceTo(candidate)?.let {
             it < MIN_VERTEX_SEPARATION_METERS
         } ?: false
+
+    private fun ArMeasureAction.shouldPersistMeasurement(): Boolean = when (this) {
+        is ArMeasureAction.ReticleUpdated,
+        is ArMeasureAction.TrackingChanged,
+        is ArMeasureAction.RenderFailed,
+        ArMeasureAction.ClearMessage,
+        ArMeasureAction.SessionRestartHandled -> false
+        else -> true
+    }
 
     private data class MeasurementSnapshot(
         val phase: ArMeasurePhase,

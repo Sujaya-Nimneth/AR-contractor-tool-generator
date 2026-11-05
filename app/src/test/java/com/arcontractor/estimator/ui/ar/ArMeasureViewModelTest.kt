@@ -215,6 +215,24 @@ class ArMeasureViewModelTest {
         assertNotNull(restored.referencePose)
     }
 
+    @Test
+    fun `frame telemetry does not rewrite saved measurement state`() {
+        val savedStateHandle = androidx.lifecycle.SavedStateHandle()
+        val viewModel = ArMeasureViewModel(savedStateHandle)
+        updateReticle(viewModel, point(0.0, 0.0, 0.0))
+        viewModel.onAction(ArMeasureAction.PlacePoint)
+        val savedDraft = savedStateHandle.get<String>("ar_measurement_draft")
+
+        updateReticle(viewModel, point(1.0, 0.0, 0.0))
+        viewModel.onAction(ArMeasureAction.TrackingChanged(true))
+        viewModel.onAction(ArMeasureAction.RenderFailed("Preview failed"))
+        viewModel.onAction(ArMeasureAction.ClearMessage)
+
+        assertEquals(savedDraft, savedStateHandle.get<String>("ar_measurement_draft"))
+        val restoredViewModel = ArMeasureViewModel(savedStateHandle)
+        assertEquals(1, restoredViewModel.uiState.value.outerVertices.size)
+    }
+
     private fun squareSurfaceViewModel(): ArMeasureViewModel {
         val viewModel = ArMeasureViewModel()
         val corners = listOf(
