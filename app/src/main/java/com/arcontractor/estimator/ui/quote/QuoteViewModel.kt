@@ -161,7 +161,6 @@ class QuoteViewModel(
         _uiState.update { it.copy(isSavingMeasurement = true, message = null) }
         viewModelScope.launch {
             runCatching {
-                materialCatalogRepository.ensureSeeded()
                 val projectId = projectRepository.ensureDefaultProject()
                 val workspace = projectRepository.observeWorkspace(projectId)
                     .filterNotNull()
