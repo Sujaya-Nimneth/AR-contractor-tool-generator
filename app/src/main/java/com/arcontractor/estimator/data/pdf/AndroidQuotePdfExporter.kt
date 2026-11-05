@@ -6,6 +6,7 @@ import com.arcontractor.estimator.data.repository.ProjectWorkspace
 import java.io.File
 import java.time.Clock
 import java.time.LocalDate
+import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
@@ -29,9 +30,11 @@ class AndroidQuotePdfExporter(
             "The quote export directory could not be created."
         }
 
+        val now = LocalDateTime.now(clock)
         val fileName = PdfQuoteFormat.fileName(
             projectName = workspace.project.name,
-            quoteDate = LocalDate.now(clock)
+            quoteDate = now.toLocalDate(),
+            exportTime = now
         )
         val outputFile = File(exportDirectory, fileName)
         val pageCount = generator.generate(
@@ -44,6 +47,7 @@ class AndroidQuotePdfExporter(
             authority,
             outputFile
         )
+        pruneOldExports(exportDirectory, keepFile = outputFile)
         PdfExportResult(
             file = outputFile,
             contentUri = contentUri,
@@ -51,7 +55,19 @@ class AndroidQuotePdfExporter(
         )
     }
 
+    private fun pruneOldExports(directory: File, keepFile: File) {
+        val exports = directory.listFiles { file ->
+            file.isFile && file.name.endsWith(".pdf")
+        }?.sortedByDescending(File::lastModified).orEmpty()
+        exports.drop(MAX_PRIVATE_EXPORTS).forEach { file ->
+            if (file.absolutePath != keepFile.absolutePath) {
+                file.delete()
+            }
+        }
+    }
+
     private companion object {
         const val EXPORT_DIRECTORY = "quote-exports"
+        const val MAX_PRIVATE_EXPORTS = 12
     }
 }

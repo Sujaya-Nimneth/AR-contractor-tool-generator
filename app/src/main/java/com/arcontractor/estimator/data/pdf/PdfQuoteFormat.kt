@@ -3,6 +3,7 @@ package com.arcontractor.estimator.data.pdf
 import com.arcontractor.estimator.domain.estimation.QuoteLineCategory
 import java.math.BigDecimal
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
@@ -17,14 +18,19 @@ object PdfQuoteFormat {
         return "Q-${quoteDate.format(DateTimeFormatter.BASIC_ISO_DATE)}-$suffix"
     }
 
-    fun fileName(projectName: String, quoteDate: LocalDate): String {
+    fun fileName(
+        projectName: String,
+        quoteDate: LocalDate,
+        exportTime: LocalDateTime = quoteDate.atStartOfDay()
+    ): String {
         val slug = projectName
             .lowercase(Locale.US)
             .replace(Regex("[^a-z0-9]+"), "-")
             .trim('-')
             .ifBlank { "contractor-quote" }
             .take(48)
-        return "quote-$slug-${quoteDate.format(DateTimeFormatter.ISO_LOCAL_DATE)}.pdf"
+        val revision = exportTime.format(DateTimeFormatter.ofPattern("HHmmss", Locale.US))
+        return "quote-$slug-${quoteDate.format(DateTimeFormatter.ISO_LOCAL_DATE)}-$revision.pdf"
     }
 
     fun money(value: BigDecimal): String =
