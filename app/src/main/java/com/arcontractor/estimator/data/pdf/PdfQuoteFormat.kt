@@ -29,7 +29,7 @@ object PdfQuoteFormat {
             .trim('-')
             .ifBlank { "contractor-quote" }
             .take(48)
-        val revision = exportTime.format(DateTimeFormatter.ofPattern("HHmmss", Locale.US))
+        val revision = exportTime.format(DateTimeFormatter.ofPattern("HHmmssSSS", Locale.US))
         return "quote-$slug-${quoteDate.format(DateTimeFormatter.ISO_LOCAL_DATE)}-$revision.pdf"
     }
 

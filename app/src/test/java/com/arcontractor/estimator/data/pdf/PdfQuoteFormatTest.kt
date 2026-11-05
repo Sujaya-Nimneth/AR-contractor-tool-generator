@@ -18,18 +18,32 @@ class PdfQuoteFormatTest {
         assertEquals(first, second)
         assertTrue(first.matches(Regex("Q-\\d{8}-[0-9A-F]{6}")))
         assertEquals(
-            "quote-harbor-street-renovation-2026-10-31-000000.pdf",
+            "quote-harbor-street-renovation-2026-10-31-000000000.pdf",
             PdfQuoteFormat.fileName("Harbor Street / Renovation", date)
         )
         assertEquals(
-            "quote-contractor-quote-2026-10-31-000000.pdf",
+            "quote-contractor-quote-2026-10-31-000000000.pdf",
             PdfQuoteFormat.fileName("---", date)
         )
-        val later = LocalDateTime.of(2026, 10, 31, 14, 32, 9)
+        val later = LocalDateTime.of(2026, 10, 31, 14, 32, 9, 123_000_000)
         assertTrue(
             PdfQuoteFormat.fileName("Harbor Street / Renovation", date, later)
-                .endsWith("-143209.pdf")
+                .endsWith("-143209123.pdf")
         )
+    }
+
+    @Test
+    fun `same second exports use millisecond revisions`() {
+        val date = LocalDate.of(2026, 10, 31)
+        val first = LocalDateTime.of(2026, 10, 31, 14, 32, 9, 123_000_000)
+        val second = LocalDateTime.of(2026, 10, 31, 14, 32, 9, 456_000_000)
+
+        val firstName = PdfQuoteFormat.fileName("Harbor Street", date, first)
+        val secondName = PdfQuoteFormat.fileName("Harbor Street", date, second)
+
+        assertTrue(firstName != secondName)
+        assertTrue(firstName.endsWith("-143209123.pdf"))
+        assertTrue(secondName.endsWith("-143209456.pdf"))
     }
 
     @Test

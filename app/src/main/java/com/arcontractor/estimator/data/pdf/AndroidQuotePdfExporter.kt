@@ -5,7 +5,6 @@ import androidx.core.content.FileProvider
 import com.arcontractor.estimator.data.repository.ProjectWorkspace
 import java.io.File
 import java.time.Clock
-import java.time.LocalDate
 import java.time.LocalDateTime
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -36,7 +35,7 @@ class AndroidQuotePdfExporter(
             quoteDate = now.toLocalDate(),
             exportTime = now
         )
-        val outputFile = File(exportDirectory, fileName)
+        val outputFile = uniqueOutputFile(exportDirectory, fileName)
         val pageCount = generator.generate(
             workspace = workspace,
             options = options,
@@ -64,6 +63,19 @@ class AndroidQuotePdfExporter(
                 file.delete()
             }
         }
+    }
+
+    private fun uniqueOutputFile(directory: File, fileName: String): File {
+        val requested = File(directory, fileName)
+        if (!requested.exists()) return requested
+        val stem = fileName.removeSuffix(".pdf")
+        var revision = 1
+        var candidate = File(directory, "$stem-r$revision.pdf")
+        while (candidate.exists()) {
+            revision += 1
+            candidate = File(directory, "$stem-r$revision.pdf")
+        }
+        return candidate
     }
 
     private companion object {
