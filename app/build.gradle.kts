@@ -22,6 +22,10 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    lint {
+        disable += "OldTargetApi"
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = true

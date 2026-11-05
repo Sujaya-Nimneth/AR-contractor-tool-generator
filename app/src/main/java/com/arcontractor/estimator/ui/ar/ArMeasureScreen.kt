@@ -21,6 +21,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -80,7 +81,7 @@ fun ArMeasureScreen(
     val hitTester = remember { ReticleHitTester() }
     val sessionController = remember { ArSessionController() }
     var arSceneView by remember { mutableStateOf<ARSceneView?>(null) }
-    var sessionGeneration by remember { mutableStateOf(0) }
+    var sessionGeneration by remember { mutableIntStateOf(0) }
     var readiness by remember {
         mutableStateOf<com.arcontractor.estimator.spatial.tracking.ArReadiness>(
             context.checkArReadiness()
