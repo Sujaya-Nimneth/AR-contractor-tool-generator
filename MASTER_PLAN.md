@@ -1,6 +1,6 @@
 # AR Contractor Quote & Material Estimation App — Master Engineering Plan
 
-> **Architecture Status:** **Phase 4 Complete & Verified** (`:core-domain:test` 23/23 + `:app:testDebugUnitTest` 37/37 + `:app:compileDebugKotlin`, `:app:compileDebugAndroidTestKotlin`, `:app:assembleDebug`, and `:app:lintDebug` green) — **Ready for Final Review**
+> **Architecture Status:** **Phase 5 Complete & Verified** (`:core-domain:test`, `:app:testDebugUnitTest`, `:app:compileDebugKotlin`, `:app:compileDebugAndroidTestKotlin`, `:app:assembleDebug`, `:app:assembleRelease`, and `:app:lintDebug` green) — **Final Hardening Complete**
 > **Target Platform:** Native Android (Min SDK 26 / Target SDK 35 / Compile SDK 36, Kotlin 2.2.0, Jetpack Compose Material 3)  
 > **Offline Guarantee:** 100% On-Device Spatial Math, Room Persistence, and Vector `PdfDocument` Generation (Zero Cloud Dependencies)
 
@@ -141,6 +141,17 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
 - [x] `data.pdf.BlueprintCanvasRenderer`: Aspect-preserving 2D $(u_i, v_i)$ bounding-box normalization, outer polygon stroke/fill, diagonal-hatched cutout zones, outward-offset edge dimension labels, scale bar, and surface summary legend
 - [x] `data.pdf.PdfQuoteGenerator`: Multi-page A4/Letter `PdfDocument` layout with contractor branding header, client metadata, vector blueprint diagram, itemized materials/consumables/labor table, tax/total summary, validity date, and client signature block + Android `FileProvider` share sheet integration
 
+### Phase 5: Final-Review Hardening *(Complete & Verified)*
+- [x] AR readiness checks, unsupported-device guidance, camera/settings recovery, and re-creatable session error states
+- [x] Runtime ARCore depth capability detection with plane-only fallback and depth-occlusion gating
+- [x] Locked-surface normal normalization for depth hits and recoverable tracking/session state transitions
+- [x] Deterministic project-level tax allocation so surface totals reconcile exactly with cover, itemized, and project totals
+- [x] Cent-normalized labor unit prices so displayed unit price × quantity equals the line total
+- [x] Complete paginated surface-summary pages for quotes with more than eight surfaces
+- [x] Revisioned private PDF filenames, bounded export cleanup, and explicit Android backup/data-extraction exclusions
+- [x] SavedStateHandle restoration of in-progress AR measurements and startup-only catalog seeding
+- [x] Release/R8 verify, explicit serialization keep rules, zero lint warnings, and share-sheet string extraction
+
 ---
 
 ## 6. Cross-Agent Handoff Contracts (Phases 1 → 4)
@@ -261,4 +272,11 @@ To prevent SceneView 1.x vs 2.x API drift, use these exact classes verified insi
 2. Blueprint viewports preserve aspect ratio, invert planar `+v` to page `-y`, keep outward dimension callouts inside the page, and render hatched door/window cutouts with dual metric/imperial labels.
 3. Exports are written to app-private storage and exposed only through the configured read-only `FileProvider` share URI.
 4. Native previews, unit tests, instrumentation-test compilation, debug APK assembly, and Android lint pass with no errors; the tracked Room schema matches the production branding migration.
+
+### H. Phase 5 Exit Criteria (Verified)
+1. AR availability, camera permission, installation state, depth capability, and session failures have explicit user-facing states with retry, settings, or non-AR fallback actions.
+2. Project tax is computed once at project level and allocated deterministically to surfaces; the sum of surface taxes and grand totals equals the project tax and grand total.
+3. PDF surface summaries paginate every surface, exports use unique revisioned filenames, old private exports are pruned, and local quote data is excluded from Android backups.
+4. In-progress AR measurements survive process death through `SavedStateHandle`, and deleting the last catalog material no longer resurrects defaults on the next saved measurement.
+5. Debug and release assembly, JVM tests, instrumentation-test compilation, and Android lint complete successfully with zero lint issues.
 

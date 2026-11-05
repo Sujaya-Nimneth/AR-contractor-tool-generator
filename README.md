@@ -10,7 +10,8 @@ An offline-first Android app for measuring contractor surfaces in AR, estimating
 - Room-backed projects, surfaces, cutouts, editable contractor branding, and a seeded material catalog.
 - Responsive Jetpack Compose quote workspace with material, waste, labor, and tax controls.
 - Native A4 and US Letter vector PDF exports with contractor branding, hatched blueprints, dimension callouts, itemized pricing, terms, and a signature block.
-- Private PDF storage exposed to the Android share sheet through a read-only `FileProvider`.
+- Private, revisioned PDF storage exposed to the Android share sheet through a read-only `FileProvider`.
+- Deterministic project-level tax allocation, paginated surface summaries, and local data excluded from Android backups.
 
 All geometry, persistence, estimation, and document generation run on-device. The app has no cloud data dependency.
 
@@ -47,6 +48,9 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
 # Assemble and lint the debug app
 ./gradlew :app:assembleDebug :app:lintDebug
+
+# Verify the minified release build and R8 keep rules
+./gradlew :app:assembleRelease
 ```
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
