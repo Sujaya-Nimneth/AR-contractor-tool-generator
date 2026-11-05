@@ -180,6 +180,34 @@ class QuoteViewModelTest {
         assertEquals(45, state.exportDraft.validityDays)
     }
 
+    @Test
+    fun `saving a measurement does not reseed an intentionally empty catalog`() = runTest {
+        val viewModel = createViewModel()
+        val state = viewModel.uiState.value
+        val materials = state.workspace?.materials.orEmpty()
+        assertEquals(5, materials.size)
+
+        materials.forEach { material ->
+            viewModel.onAction(QuoteAction.OpenCatalog)
+            viewModel.onAction(QuoteAction.EditCatalogMaterial(material.id))
+            viewModel.onAction(QuoteAction.DeleteCatalogMaterial)
+        }
+        assertEquals(0, viewModel.uiState.value.workspace?.materials?.size)
+
+        viewModel.onAction(
+            QuoteAction.SaveMeasurement(
+                MeasurementCapture(
+                    outerVertices = RECTANGLE,
+                    referenceNormal = Vec3(0.0, 0.0, 1.0),
+                    cutouts = emptyList()
+                )
+            )
+        )
+
+        assertEquals(0, viewModel.uiState.value.workspace?.materials?.size)
+        assertTrue(viewModel.uiState.value.message?.isError == true)
+    }
+
     private fun createViewModel(
         exporter: QuotePdfExporter = RecordingQuotePdfExporter()
     ): QuoteViewModel {
