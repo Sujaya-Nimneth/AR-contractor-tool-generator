@@ -197,6 +197,24 @@ class ArMeasureViewModelTest {
         assertFalse(state.canRetrySession)
     }
 
+    @Test
+    fun `saved state restores measurement geometry across a fresh view model`() {
+        val savedStateHandle = androidx.lifecycle.SavedStateHandle()
+        val firstViewModel = ArMeasureViewModel(savedStateHandle)
+        updateReticle(firstViewModel, point(0.0, 0.0, 0.0))
+        firstViewModel.onAction(ArMeasureAction.PlacePoint)
+        updateReticle(firstViewModel, point(1.0, 0.0, 0.0))
+        firstViewModel.onAction(ArMeasureAction.PlacePoint)
+        firstViewModel.persistMeasurementState()
+
+        val restoredViewModel = ArMeasureViewModel(savedStateHandle)
+
+        val restored = restoredViewModel.uiState.value
+        assertEquals(ArMeasurePhase.PLACING_OUTER_BOUNDARY, restored.phase)
+        assertEquals(2, restored.outerVertices.size)
+        assertNotNull(restored.referencePose)
+    }
+
     private fun squareSurfaceViewModel(): ArMeasureViewModel {
         val viewModel = ArMeasureViewModel()
         val corners = listOf(
