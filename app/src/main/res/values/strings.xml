@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">AR Contractor Estimator</string>
+    <string name="share_contractor_quote">Share contractor quote</string>
+    <string name="share_quote_pdf">Contractor quote PDF</string>
 </resources>

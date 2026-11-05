@@ -13,6 +13,7 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.arcontractor.estimator.ui.ar.ArMeasureScreen
+import com.arcontractor.estimator.R
 import com.arcontractor.estimator.ui.quote.QuoteAction
 import com.arcontractor.estimator.ui.quote.QuoteScreen
 import com.arcontractor.estimator.ui.quote.QuoteViewModel
@@ -62,11 +63,17 @@ private fun EstimatorApp(container: AppContainer) {
                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                         type = "application/pdf"
                         putExtra(Intent.EXTRA_STREAM, result.contentUri)
-                        clipData = ClipData.newRawUri("Contractor quote PDF", result.contentUri)
+                        clipData = ClipData.newRawUri(
+                            context.getString(R.string.share_quote_pdf),
+                            result.contentUri
+                        )
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
                     context.startActivity(
-                        Intent.createChooser(shareIntent, "Share contractor quote")
+                        Intent.createChooser(
+                            shareIntent,
+                            context.getString(R.string.share_contractor_quote)
+                        )
                     )
                 }
             )
