@@ -208,6 +208,38 @@ class QuoteViewModelTest {
         assertTrue(viewModel.uiState.value.message?.isError == true)
     }
 
+    @Test
+    fun `high tax rates above thirty percent are accepted`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.onAction(
+            QuoteAction.SaveMeasurement(
+                MeasurementCapture(
+                    outerVertices = RECTANGLE,
+                    referenceNormal = Vec3(0.0, 0.0, 1.0),
+                    cutouts = emptyList()
+                )
+            )
+        )
+
+        viewModel.onAction(QuoteAction.SetProjectTaxRate(0.40))
+
+        val state = viewModel.uiState.value
+        assertEquals(0.40, state.workspace?.quote?.taxRate ?: -1.0, 0.0)
+        assertEquals(0.40, state.selectedSurface?.estimate?.taxRate ?: -1.0, 0.0)
+    }
+
+    @Test
+    fun `out-of-range tax rates are rejected with an error instead of clamped`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.onAction(QuoteAction.SetProjectTaxRate(0.08))
+
+        viewModel.onAction(QuoteAction.SetProjectTaxRate(1.5))
+
+        val state = viewModel.uiState.value
+        assertEquals(0.08, state.workspace?.quote?.taxRate ?: -1.0, 0.0)
+        assertTrue(state.message?.isError == true)
+    }
+
     private fun createViewModel(
         exporter: QuotePdfExporter = RecordingQuotePdfExporter()
     ): QuoteViewModel {
