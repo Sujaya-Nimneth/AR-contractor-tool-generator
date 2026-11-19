@@ -76,6 +76,21 @@ class QuoteViewModel(
             is QuoteAction.DeleteSurface -> deleteSurface(action)
             is QuoteAction.SetProjectTaxRate -> setProjectTaxRate(action.rate)
             is QuoteAction.SetProjectTaxPolicy -> setProjectTaxPolicy(action.policy)
+            QuoteAction.OpenProjectSwitcher -> _uiState.update {
+                it.copy(isProjectSwitcherOpen = true, newProjectNameText = "", message = null)
+            }
+
+            QuoteAction.CloseProjectSwitcher -> _uiState.update {
+                it.copy(isProjectSwitcherOpen = false, newProjectNameText = "")
+            }
+
+            is QuoteAction.SwitchProject -> switchProject(action.projectId)
+            is QuoteAction.UpdateNewProjectName -> _uiState.update {
+                it.copy(newProjectNameText = action.text.take(80))
+            }
+
+            QuoteAction.CreateProject -> createProject()
+            is QuoteAction.DeleteProject -> deleteProject(action.projectId)
             QuoteAction.OpenProjectDetails -> openProjectDetails()
             QuoteAction.CloseProjectDetails -> _uiState.update {
                 it.copy(
@@ -138,8 +153,14 @@ class QuoteViewModel(
                 materialCatalogRepository.ensureSeeded()
                 projectRepository.ensureDefaultProject()
             }.onSuccess { projectId ->
-                _uiState.update { it.copy(projectId = projectId) }
-                projectRepository.observeWorkspace(projectId)
+                val activeId = _uiState.value.projectId ?: projectId
+                _uiState.update { it.copy(projectId = activeId) }
+                launch {
+                    projectRepository.observeProjects().collect { projects ->
+                        _uiState.update { it.copy(projects = projects) }
+                    }
+                }
+                projectRepository.observeWorkspace(activeId)
                     .catch { error ->
                         showError(error.message ?: "The saved quote could not be loaded.")
                         _uiState.update { it.copy(isLoading = false) }
@@ -151,6 +172,66 @@ class QuoteViewModel(
                 showError(error.message ?: "The local quote database could not be opened.")
                 _uiState.update { it.copy(isLoading = false) }
             }
+        }
+    }
+
+    private fun switchProject(projectId: String) {
+        if (projectId == _uiState.value.projectId) {
+            _uiState.update { it.copy(isProjectSwitcherOpen = false) }
+            return
+        }
+        _uiState.update {
+            it.copy(
+                projectId = projectId,
+                selectedSurfaceId = null,
+                isProjectSwitcherOpen = false,
+                workspace = null
+            )
+        }
+        bootstrap()
+    }
+
+    private fun createProject() {
+        val name = _uiState.value.newProjectNameText.trim()
+        if (name.isBlank()) {
+            showError("Enter a name for the new project.")
+            return
+        }
+        viewModelScope.launch {
+            runCatching { projectRepository.createProject(name) }
+                .onSuccess { projectId ->
+                    _uiState.update {
+                        it.copy(
+                            newProjectNameText = "",
+                            message = QuoteMessage("$name created.")
+                        )
+                    }
+                    switchProject(projectId)
+                }
+                .onFailure { error ->
+                    showError(error.message ?: "The project could not be created.")
+                }
+        }
+    }
+
+    private fun deleteProject(projectId: String) {
+        viewModelScope.launch {
+            runCatching { projectRepository.deleteProject(projectId) }
+                .onSuccess {
+                    if (_uiState.value.projectId == projectId) {
+                        val fallback = _uiState.value.projects
+                            .firstOrNull { it.id != projectId }?.id
+                        if (fallback != null) {
+                            switchProject(fallback)
+                        }
+                    }
+                    _uiState.update {
+                        it.copy(message = QuoteMessage("Project deleted."))
+                    }
+                }
+                .onFailure { error ->
+                    showError(error.message ?: "The project could not be deleted.")
+                }
         }
     }
 

@@ -2,6 +2,7 @@ package com.arcontractor.estimator.ui.quote
 
 import com.arcontractor.estimator.data.repository.ProjectWorkspace
 import com.arcontractor.estimator.data.repository.SurfaceQuoteLine
+import com.arcontractor.estimator.data.local.ProjectEntity
 import com.arcontractor.estimator.data.pdf.PdfExportResult
 import com.arcontractor.estimator.data.pdf.PdfPaperSize
 import com.arcontractor.estimator.domain.estimation.PackageUnitType
@@ -106,6 +107,9 @@ data class QuoteUiState(
     val projectDetailsDraft: ProjectMetadataDraft? = null,
     val isManualEntryOpen: Boolean = false,
     val manualSurfaceDraft: ManualSurfaceDraft? = null,
+    val projects: List<ProjectEntity> = emptyList(),
+    val isProjectSwitcherOpen: Boolean = false,
+    val newProjectNameText: String = "",
     val isExportDialogOpen: Boolean = false,
     val exportDraft: QuoteExportDraft = QuoteExportDraft(),
     val exportedPdf: PdfExportResult? = null,
@@ -134,6 +138,12 @@ sealed interface QuoteAction {
     data class DeleteSurface(val surfaceId: String) : QuoteAction
     data class SetProjectTaxRate(val rate: Double) : QuoteAction
     data class SetProjectTaxPolicy(val policy: TaxPolicy) : QuoteAction
+    data object OpenProjectSwitcher : QuoteAction
+    data object CloseProjectSwitcher : QuoteAction
+    data class SwitchProject(val projectId: String) : QuoteAction
+    data class UpdateNewProjectName(val text: String) : QuoteAction
+    data object CreateProject : QuoteAction
+    data class DeleteProject(val projectId: String) : QuoteAction
     data object OpenProjectDetails : QuoteAction
     data object CloseProjectDetails : QuoteAction
     data class UpdateProjectDetails(val draft: ProjectMetadataDraft) : QuoteAction
