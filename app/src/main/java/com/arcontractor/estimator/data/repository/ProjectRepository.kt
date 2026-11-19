@@ -30,6 +30,7 @@ interface ProjectRepository {
 
     suspend fun ensureDefaultProject(): String
     suspend fun addSurface(projectId: String, draft: SurfaceMeasurementDraft): String
+    suspend fun replaceSurfaceMeasurement(surfaceId: String, draft: SurfaceMeasurementDraft)
     suspend fun updateSurfaceSettings(
         surfaceId: String,
         materialId: String,
@@ -143,6 +144,46 @@ class RoomProjectRepository(
         projectId: String,
         draft: SurfaceMeasurementDraft
     ): String {
+        val timestamp = now()
+        val surfaceId = idGenerator()
+        val (surface, cutouts) = buildSurfaceEntities(
+            surfaceId = surfaceId,
+            projectId = projectId,
+            draft = draft,
+            timestamp = timestamp
+        )
+        surfaceDao.replaceSurface(surface, cutouts)
+        return surfaceId
+    }
+
+    override suspend fun replaceSurfaceMeasurement(
+        surfaceId: String,
+        draft: SurfaceMeasurementDraft
+    ) {
+        val existing = surfaceDao.getById(surfaceId)
+            ?: error("The surface to replace no longer exists.")
+        val (surface, cutouts) = buildSurfaceEntities(
+            surfaceId = surfaceId,
+            projectId = existing.projectId,
+            draft = draft.copy(
+                materialId = existing.materialId,
+                wastePresetOverride = existing.wastePresetOverride,
+                customWasteFactorOverride = existing.customWasteFactorOverride,
+                laborRateOverride = existing.laborRateOverride
+            ),
+            timestamp = now(),
+            createdAtEpochMillis = existing.createdAtEpochMillis
+        )
+        surfaceDao.replaceSurface(surface, cutouts)
+    }
+
+    private suspend fun buildSurfaceEntities(
+        surfaceId: String,
+        projectId: String,
+        draft: SurfaceMeasurementDraft,
+        timestamp: Long,
+        createdAtEpochMillis: Long = timestamp
+    ): Pair<SurfaceEntity, List<CutoutEntity>> {
         require(draft.name.isNotBlank()) { "Surface name cannot be blank." }
         require(draft.outerVertices.size >= 3) { "A surface requires at least three anchors." }
 
@@ -166,8 +207,6 @@ class RoomProjectRepository(
             materialSpec = effectiveMaterial
         )
 
-        val timestamp = now()
-        val surfaceId = idGenerator()
         val surface = SurfaceEntity(
             id = surfaceId,
             projectId = projectId,
@@ -178,14 +217,13 @@ class RoomProjectRepository(
             wastePresetOverride = draft.wastePresetOverride,
             customWasteFactorOverride = draft.customWasteFactorOverride,
             laborRateOverride = draft.laborRateOverride,
-            createdAtEpochMillis = timestamp,
+            createdAtEpochMillis = createdAtEpochMillis,
             updatedAtEpochMillis = timestamp
         )
         val cutouts = draft.cutouts.mapIndexed { index, cutout ->
             cutout.toEntity(surfaceId = surfaceId, displayOrder = index)
         }
-        surfaceDao.replaceSurface(surface, cutouts)
-        return surfaceId
+        return surface to cutouts
     }
 
     override suspend fun updateSurfaceSettings(
