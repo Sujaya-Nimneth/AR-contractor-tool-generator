@@ -18,6 +18,7 @@ data class ProjectEntity(
     val contractorLicense: String,
     val taxRate: Double,
     val taxPolicy: String,
+    val currencyCode: String = "USD",
     val createdAtEpochMillis: Long,
     val updatedAtEpochMillis: Long
 )
