@@ -236,6 +236,55 @@ class RepositoryTest {
         assertTrue(workspace.quote.grandTotal > BigDecimal.ZERO)
     }
 
+    @Test
+    fun `replaceSurfaceMeasurement keeps identity pricing and creation order`() = runTest {
+        val fixtures = RepositoryFixtures()
+        val projectId = fixtures.projectRepository.ensureDefaultProject()
+        val surfaceId = fixtures.projectRepository.addSurface(
+            projectId = projectId,
+            draft = SurfaceMeasurementDraft(
+                name = "Original wall",
+                outerVertices = RECTANGLE_6_SQ_METERS,
+                referenceNormal = Vec3(0.0, 0.0, 1.0),
+                cutouts = listOf(DOOR_CUTOUT),
+                materialId = DefaultMaterialCatalog.porcelainTile300x600Straight.id,
+                laborRateOverride = 60.0
+            )
+        )
+        val original = fixtures.surfaceDao.currentSurfaces.single().surface
+
+        fixtures.projectRepository.replaceSurfaceMeasurement(
+            surfaceId = surfaceId,
+            draft = SurfaceMeasurementDraft(
+                name = "Re-measured wall",
+                outerVertices = listOf(
+                    Vec3(0.0, 0.0, 0.0),
+                    Vec3(4.0, 0.0, 0.0),
+                    Vec3(4.0, 2.5, 0.0),
+                    Vec3(0.0, 2.5, 0.0)
+                ),
+                referenceNormal = Vec3(0.0, 0.0, 1.0),
+                cutouts = emptyList(),
+                materialId = DefaultMaterialCatalog.oakLuxuryVinylPlank.id
+            )
+        )
+
+        val workspace = fixtures.projectRepository.observeWorkspace(projectId)
+            .filterNotNull()
+            .first()
+        val surface = workspace.surfaces.single()
+        assertEquals(surfaceId, surface.surfaceId)
+        assertEquals("Re-measured wall", surface.surfaceName)
+        assertEquals(10.0, surface.analysis?.netAreaSqMeters ?: -1.0, 1e-6)
+        assertTrue(surface.cutouts.isEmpty())
+        // Pricing stays with the original assignment, not the draft's material.
+        assertEquals(DefaultMaterialCatalog.porcelainTile300x600Straight.id, surface.materialId)
+        assertEquals(60.0, surface.effectiveMaterial.laborRatePerUnitArea, 1e-9)
+        val stored = fixtures.surfaceDao.currentSurfaces.single().surface
+        assertEquals(original.createdAtEpochMillis, stored.createdAtEpochMillis)
+        assertNull(surface.loadError)
+    }
+
     private class RepositoryFixtures {
         val projectDao = FakeProjectDao()
         val surfaceDao = FakeSurfaceDao()
