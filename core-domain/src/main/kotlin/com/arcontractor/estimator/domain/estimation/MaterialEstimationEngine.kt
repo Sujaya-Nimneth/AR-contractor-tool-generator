@@ -41,6 +41,8 @@ object MaterialEstimationEngine {
         val cutoutArea = max(0.0, geometry.cutoutAreaSqMeters)
         val outerPerimeter = max(0.0, geometry.outerPerimeterMeters)
         val cutoutPerimeter = max(0.0, geometry.cutoutPerimeterMeters)
+        val effectiveCutoutPerimeter = max(0.0, geometry.effectiveCutoutPerimeterMeters)
+        val doorOpeningWidth = max(0.0, geometry.doorOpeningWidthMeters)
         val wasteFactor = materialSpec.effectiveWasteFactor
 
         if (netArea <= ZERO_AREA_EPSILON) {
@@ -93,7 +95,8 @@ object MaterialEstimationEngine {
             netAreaSqMeters = netArea,
             grossMaterialAreaSqMeters = grossMaterialArea,
             outerPerimeterMeters = outerPerimeter,
-            cutoutPerimeterMeters = cutoutPerimeter
+            cutoutPerimeterMeters = effectiveCutoutPerimeter,
+            doorOpeningWidthMeters = doorOpeningWidth
         )
 
         val materialSubtotal = CurrencyMath.multiplyQty(boxesRequired, materialSpec.unitCost)
@@ -168,7 +171,8 @@ object MaterialEstimationEngine {
         netAreaSqMeters: Double,
         grossMaterialAreaSqMeters: Double,
         outerPerimeterMeters: Double,
-        cutoutPerimeterMeters: Double
+        cutoutPerimeterMeters: Double,
+        doorOpeningWidthMeters: Double
     ): List<ConsumableEstimate> = when (params) {
         is TradeParameters.Tiling -> estimateTilingConsumables(
             params = params,
@@ -179,7 +183,8 @@ object MaterialEstimationEngine {
         is TradeParameters.Flooring -> estimateFlooringConsumables(
             params = params,
             grossMaterialAreaSqMeters = grossMaterialAreaSqMeters,
-            outerPerimeterMeters = outerPerimeterMeters
+            outerPerimeterMeters = outerPerimeterMeters,
+            doorOpeningWidthMeters = doorOpeningWidthMeters
         )
         is TradeParameters.Painting -> estimatePaintingConsumables(
             params = params,
@@ -265,7 +270,7 @@ object MaterialEstimationEngine {
             items.add(
                 ConsumableEstimate(
                     name = String.format(Locale.US, "Aluminum Tile Edge Trim Profile (%.2f m)", params.edgeTrimStripLengthMeters),
-                    calculationBasis = String.format(Locale.US, "%.2f m cutout perimeter + 10%% miter waste", cutoutPerimeterMeters),
+                    calculationBasis = String.format(Locale.US, "%.2f m effective opening perimeter + 10%% miter waste", cutoutPerimeterMeters),
                     quantityRequired = trimStrips,
                     unitType = PackageUnitType.STRIP,
                     rawAmountEstimate = trimMetersWithMiterWaste,
@@ -282,7 +287,8 @@ object MaterialEstimationEngine {
     private fun estimateFlooringConsumables(
         params: TradeParameters.Flooring,
         grossMaterialAreaSqMeters: Double,
-        outerPerimeterMeters: Double
+        outerPerimeterMeters: Double,
+        doorOpeningWidthMeters: Double
     ): List<ConsumableEstimate> {
         val items = ArrayList<ConsumableEstimate>(2)
 
@@ -302,13 +308,30 @@ object MaterialEstimationEngine {
             )
         }
 
-        if (params.includePerimeterBaseboard && outerPerimeterMeters > 1e-4) {
-            val linearMeters = outerPerimeterMeters * (1.0 + params.baseboardMiterWasteFactor)
+        val baseboardRunMeters = max(0.0, outerPerimeterMeters - doorOpeningWidthMeters)
+        if (params.includePerimeterBaseboard && baseboardRunMeters > 1e-4) {
+            val linearMeters = baseboardRunMeters * (1.0 + params.baseboardMiterWasteFactor)
+            val basisText = if (doorOpeningWidthMeters > 1e-4) {
+                String.format(
+                    Locale.US,
+                    "%.2f m perimeter − %.2f m doorways + %.0f%% waste",
+                    outerPerimeterMeters,
+                    doorOpeningWidthMeters,
+                    params.baseboardMiterWasteFactor * 100.0
+                )
+            } else {
+                String.format(
+                    Locale.US,
+                    "%.2f m room perimeter + %.0f%% waste",
+                    outerPerimeterMeters,
+                    params.baseboardMiterWasteFactor * 100.0
+                )
+            }
             val pieces = ceil(linearMeters / params.baseboardPieceLengthMeters).toInt()
             items.add(
                 ConsumableEstimate(
                     name = String.format(Locale.US, "Perimeter Baseboard / Quarter-Round (%.2f m)", params.baseboardPieceLengthMeters),
-                    calculationBasis = String.format(Locale.US, "%.2f m room perimeter + %.0f%% waste", outerPerimeterMeters, params.baseboardMiterWasteFactor * 100.0),
+                    calculationBasis = basisText,
                     quantityRequired = pieces,
                     unitType = PackageUnitType.STRIP,
                     rawAmountEstimate = linearMeters,
@@ -358,7 +381,7 @@ object MaterialEstimationEngine {
             items.add(
                 ConsumableEstimate(
                     name = String.format(Locale.US, "Pro Edge Painter's Masking Tape (%.1f m)", params.tapeRollLengthMeters),
-                    calculationBasis = String.format(Locale.US, "%.2f m total outer + cutout perimeter", totalTrimPerimeter),
+                    calculationBasis = String.format(Locale.US, "%.2f m outer + effective opening perimeter", totalTrimPerimeter),
                     quantityRequired = tapeRolls,
                     unitType = PackageUnitType.ROLL,
                     rawAmountEstimate = totalTrimPerimeter,
@@ -430,7 +453,7 @@ object MaterialEstimationEngine {
             items.add(
                 ConsumableEstimate(
                     name = String.format(Locale.US, "Vinyl/Metal Cutout J-Bead Trim (%.2f m)", params.jTrimStripLengthMeters),
-                    calculationBasis = String.format(Locale.US, "%.2f m opening perimeter + 5%% waste", cutoutPerimeterMeters),
+                    calculationBasis = String.format(Locale.US, "%.2f m effective opening perimeter + 5%% waste", cutoutPerimeterMeters),
                     quantityRequired = beadStrips,
                     unitType = PackageUnitType.STRIP,
                     rawAmountEstimate = beadMeters,

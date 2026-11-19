@@ -178,4 +178,133 @@ class PolygonGeometryEngineTest {
         assertEquals("8' 0\"", UnitConverter.formatArchitecturalFeetInches(2.4384))
         assertEquals("3' 6\"", UnitConverter.formatArchitecturalFeetInches(1.0668))
     }
+
+    @Test
+    fun `overlapping cutouts count shared trim edges only once in effective perimeter`() {
+        val outer = listOf(
+            Vec2(0.0, 0.0),
+            Vec2(4.0, 0.0),
+            Vec2(4.0, 4.0),
+            Vec2(0.0, 4.0)
+        )
+        // Two unit squares overlapping by 0.5 x 1.0: union outline is 1.5 x 1.0 -> perimeter 5.0 m.
+        val cutA = CutoutPolygon2DInput(
+            id = "c1",
+            label = "Window A",
+            kind = CutoutKind.WINDOW,
+            vertices2D = listOf(Vec2(1.0, 1.0), Vec2(2.0, 1.0), Vec2(2.0, 2.0), Vec2(1.0, 2.0))
+        )
+        val cutB = CutoutPolygon2DInput(
+            id = "c2",
+            label = "Window B",
+            kind = CutoutKind.WINDOW,
+            vertices2D = listOf(Vec2(1.5, 1.0), Vec2(2.5, 1.0), Vec2(2.5, 2.0), Vec2(1.5, 2.0))
+        )
+
+        val result = PolygonGeometryEngine.analyze2DPolygon(
+            outerVertices2D = outer,
+            cutouts2D = listOf(cutA, cutB)
+        )
+
+        assertEquals(8.0, result.cutoutPerimeterMeters, 1e-8) // raw diagnostic: 4.0 + 4.0
+        assertEquals(5.0, result.effectiveCutoutPerimeterMeters, 1e-8) // union outline for trim
+        // Shared collinear fragments are attributed to the first owning cutout;
+        // the per-cutout split is diagnostic, only the union total drives billing.
+        assertEquals(
+            5.0,
+            result.cutouts.sumOf { it.effectivePerimeter2DMeters },
+            1e-8
+        )
+    }
+
+    @Test
+    fun `protruding cutout under clip policy excludes outside edges from effective perimeter`() {
+        val outer = listOf(
+            Vec2(0.0, 0.0),
+            Vec2(3.0, 0.0),
+            Vec2(3.0, 3.0),
+            Vec2(0.0, 3.0)
+        )
+        // 1x1 window with its right half beyond the parent's right edge:
+        // inside portion is 0.5 x 1.0. Trim runs on the three interior sides only
+        // (0.5 + 1.0 + 0.5 = 2.0 m); the side flush with the wall corner needs none.
+        val overshoot = CutoutPolygon2DInput(
+            id = "w1",
+            label = "Overshot Window",
+            kind = CutoutKind.WINDOW,
+            vertices2D = listOf(Vec2(2.5, 1.0), Vec2(3.5, 1.0), Vec2(3.5, 2.0), Vec2(2.5, 2.0))
+        )
+
+        val result = PolygonGeometryEngine.analyze2DPolygon(
+            outerVertices2D = outer,
+            cutouts2D = listOf(overshoot),
+            cutoutPolicy = CutoutValidationPolicy.CLIP_TO_PARENT
+        )
+
+        assertEquals(4.0, result.cutoutPerimeterMeters, 1e-8)
+        assertEquals(2.0, result.effectiveCutoutPerimeterMeters, 1e-8)
+        assertEquals(0.5, result.cutoutAreaSqMeters, 1e-8)
+    }
+
+    @Test
+    fun `floor-flush door reports opening width while elevated door does not`() {
+        val outer = listOf(
+            Vec2(0.0, 0.0),
+            Vec2(5.0, 0.0),
+            Vec2(5.0, 2.7),
+            Vec2(0.0, 2.7)
+        )
+        val flushDoor = CutoutPolygon2DInput(
+            id = "d1",
+            label = "Entry Door",
+            kind = CutoutKind.DOOR,
+            vertices2D = listOf(Vec2(0.5, 0.0), Vec2(1.4, 0.0), Vec2(1.4, 2.1), Vec2(0.5, 2.1))
+        )
+        val passThrough = CutoutPolygon2DInput(
+            id = "d2",
+            label = "Pass-Through",
+            kind = CutoutKind.DOOR,
+            vertices2D = listOf(Vec2(3.0, 0.9), Vec2(3.8, 0.9), Vec2(3.8, 2.0), Vec2(3.0, 2.0))
+        )
+
+        val result = PolygonGeometryEngine.analyze2DPolygon(
+            outerVertices2D = outer,
+            cutouts2D = listOf(flushDoor, passThrough)
+        )
+
+        assertEquals(0.9, result.doorOpeningWidthMeters, 1e-8)
+        // Door threshold on the parent boundary is kept; all edges lie inside/flush.
+        assertEquals(6.0 + 3.8, result.effectiveCutoutPerimeterMeters, 1e-8)
+    }
+
+    @Test
+    fun `disjoint cutouts keep full raw perimeter as effective perimeter`() {
+        val outer = listOf(
+            Vec2(0.0, 0.0),
+            Vec2(4.0, 0.0),
+            Vec2(4.0, 2.7),
+            Vec2(0.0, 2.7)
+        )
+        val door = CutoutPolygon2DInput(
+            id = "d1",
+            label = "Door",
+            kind = CutoutKind.DOOR,
+            vertices2D = listOf(Vec2(0.4, 0.0), Vec2(1.3, 0.0), Vec2(1.3, 2.1), Vec2(0.4, 2.1))
+        )
+        val window = CutoutPolygon2DInput(
+            id = "w1",
+            label = "Window",
+            kind = CutoutKind.WINDOW,
+            vertices2D = listOf(Vec2(2.0, 1.0), Vec2(3.2, 1.0), Vec2(3.2, 2.0), Vec2(2.0, 2.0))
+        )
+
+        val result = PolygonGeometryEngine.analyze2DPolygon(
+            outerVertices2D = outer,
+            cutouts2D = listOf(door, window)
+        )
+
+        assertEquals(10.4, result.cutoutPerimeterMeters, 1e-8)
+        assertEquals(10.4, result.effectiveCutoutPerimeterMeters, 1e-8)
+        assertEquals(0.9, result.doorOpeningWidthMeters, 1e-8)
+    }
 }

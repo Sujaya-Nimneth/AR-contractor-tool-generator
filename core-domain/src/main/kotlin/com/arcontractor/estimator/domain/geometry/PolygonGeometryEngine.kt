@@ -68,6 +68,21 @@ interface SurfaceGeometryMetrics {
     val netAreaSqMeters: Double
     val outerPerimeterMeters: Double
     val cutoutPerimeterMeters: Double
+
+    /**
+     * Union-aware perimeter of the cutout regions actually removed from the parent surface.
+     * Shared edges between overlapping cutouts are counted once and segments protruding
+     * outside the parent boundary are excluded, so trim/bead/tape quantities never bill
+     * for edges that do not exist on the finished surface.
+     */
+    val effectiveCutoutPerimeterMeters: Double
+        get() = cutoutPerimeterMeters
+
+    /**
+     * Width of floor-flush door openings that baseboard/quarter-round runs must skip.
+     */
+    val doorOpeningWidthMeters: Double
+        get() = 0.0
 }
 
 /**
@@ -78,7 +93,9 @@ data class BasicSurfaceGeometry(
     override val cutoutAreaSqMeters: Double = 0.0,
     override val netAreaSqMeters: Double = max(0.0, grossAreaSqMeters - cutoutAreaSqMeters),
     override val outerPerimeterMeters: Double,
-    override val cutoutPerimeterMeters: Double = 0.0
+    override val cutoutPerimeterMeters: Double = 0.0,
+    override val effectiveCutoutPerimeterMeters: Double = cutoutPerimeterMeters,
+    override val doorOpeningWidthMeters: Double = 0.0
 ) : SurfaceGeometryMetrics {
     init {
         require(grossAreaSqMeters >= 0.0) { "grossAreaSqMeters must be non-negative" }
@@ -86,6 +103,8 @@ data class BasicSurfaceGeometry(
         require(netAreaSqMeters >= 0.0) { "netAreaSqMeters must be non-negative" }
         require(outerPerimeterMeters >= 0.0) { "outerPerimeterMeters must be non-negative" }
         require(cutoutPerimeterMeters >= 0.0) { "cutoutPerimeterMeters must be non-negative" }
+        require(effectiveCutoutPerimeterMeters >= 0.0) { "effectiveCutoutPerimeterMeters must be non-negative" }
+        require(doorOpeningWidthMeters >= 0.0) { "doorOpeningWidthMeters must be non-negative" }
     }
 }
 
@@ -103,6 +122,7 @@ data class AnalyzedCutout(
     val effectiveSubtractedAreaSqMeters: Double,
     val perimeter2DMeters: Double,
     val perimeter3DMeters: Double,
+    val effectivePerimeter2DMeters: Double,
     val containmentStatus: CutoutContainmentStatus
 )
 
@@ -124,6 +144,8 @@ data class AnalyzedSurfacePolygon(
     override val outerPerimeterMeters: Double,
     val outerPerimeter3DMeters: Double,
     override val cutoutPerimeterMeters: Double,
+    override val effectiveCutoutPerimeterMeters: Double,
+    override val doorOpeningWidthMeters: Double,
     val cutoutPerimeter3DMeters: Double,
     val rmsPlanarErrorMeters: Double,
     val maxPlanarDeviationMeters: Double,
@@ -155,6 +177,7 @@ object PolygonGeometryEngine {
     private const val MIN_POLYGON_AREA_SQ_METERS = 1e-4 // 1 sq cm minimum physical polygon
     private const val STRICT_PROTRUSION_RATIO_TOLERANCE = 0.02 // 2% AR edge tap tolerance
     private const val CONTAINMENT_AREA_EPSILON = 1e-5
+    private const val DOOR_FLUSH_TOLERANCE_METERS = 0.02 // 2 cm floor-flush aiming tolerance
 
     /**
      * Projects an arbitrary 3D surface polygon ($N \ge 3$) and optional coplanar 3D cutouts onto
@@ -264,7 +287,6 @@ object PolygonGeometryEngine {
             val cutEdges = buildEdges(ccwCut2D, ccwCut3D)
             val cutPerim2D = cutEdges.sumOf { it.length2DMeters }
             val cutPerim3D = cutEdges.sumOf { it.length3DMeters }
-
             analyzedCutouts.add(
                 AnalyzedCutout(
                     id = cutout.id,
@@ -277,6 +299,7 @@ object PolygonGeometryEngine {
                     effectiveSubtractedAreaSqMeters = overlapWithParent,
                     perimeter2DMeters = cutPerim2D,
                     perimeter3DMeters = cutPerim3D,
+                    effectivePerimeter2DMeters = 0.0,
                     containmentStatus = status
                 )
             )
@@ -294,11 +317,25 @@ object PolygonGeometryEngine {
             .coerceIn(0.0, grossArea)
         val totalEffectiveCutoutArea = max(0.0, grossArea - netArea)
 
-        val sumIndividualOverlaps = analyzedCutouts.sumOf { it.effectiveSubtractedAreaSqMeters }
+        val effectivePerimeters = computeEffectiveCutoutPerimeters(ccwOuter2D, validCutoutPolys2D)
+        val effectiveCutoutPerim2D = effectivePerimeters.sum()
+        var validCutoutIndex = 0
+        val reconciledCutouts = analyzedCutouts.map { cutout ->
+            if (cutout.effectiveSubtractedAreaSqMeters > CONTAINMENT_AREA_EPSILON) {
+                cutout.copy(effectivePerimeter2DMeters = effectivePerimeters[validCutoutIndex++])
+            } else {
+                cutout.copy(effectivePerimeter2DMeters = 0.0)
+            }
+        }
+        val sumIndividualOverlaps = reconciledCutouts.sumOf { it.effectiveSubtractedAreaSqMeters }
         val hadOverlaps = (sumIndividualOverlaps - totalEffectiveCutoutArea) > 1e-4
 
-        val totalCutoutPerim2D = analyzedCutouts.sumOf { it.perimeter2DMeters }
-        val totalCutoutPerim3D = analyzedCutouts.sumOf { it.perimeter3DMeters }
+        val totalCutoutPerim2D = reconciledCutouts.sumOf { it.perimeter2DMeters }
+        val totalCutoutPerim3D = reconciledCutouts.sumOf { it.perimeter3DMeters }
+        val doorOpeningWidth = computeDoorOpeningWidth(
+            cutouts = reconciledCutouts,
+            parentMinV = ccwOuter2D.minOf { it.v }
+        )
 
         val meshTriangles2D = PolygonClipping2D.fanTriangulateConvexPieces(remainingConvexPieces)
 
@@ -308,13 +345,15 @@ object PolygonGeometryEngine {
             outerVertices2D = ccwOuter2D,
             outerEdges = outerEdges,
             boundingBox2D = BoundingBox2D.fromPoints(ccwOuter2D),
-            cutouts = analyzedCutouts,
+            cutouts = reconciledCutouts,
             grossAreaSqMeters = grossArea,
             cutoutAreaSqMeters = totalEffectiveCutoutArea,
             netAreaSqMeters = netArea,
             outerPerimeterMeters = outerPerim2D,
             outerPerimeter3DMeters = outerPerim3D,
             cutoutPerimeterMeters = totalCutoutPerim2D,
+            effectiveCutoutPerimeterMeters = effectiveCutoutPerim2D,
+            doorOpeningWidthMeters = doorOpeningWidth,
             cutoutPerimeter3DMeters = totalCutoutPerim3D,
             rmsPlanarErrorMeters = projection.rmsPlanarErrorMeters,
             maxPlanarDeviationMeters = projection.maxPlanarDeviationMeters,
@@ -423,5 +462,152 @@ object PolygonGeometryEngine {
             result.removeAt(result.lastIndex)
         }
         return result
+    }
+
+    /**
+     * Computes the union-aware trim perimeter of each cutout in one global pass.
+     *
+     * Every cutout boundary edge is split at all crossings with the parent boundary and
+     * with every other cutout boundary. A sub-segment is kept when its midpoint lies
+     * inside (or on) the parent polygon and is not strictly inside any other cutout.
+     * Because collinear shared edges between overlapping cutouts produce identical
+     * sub-segments from both sides, duplicates are collapsed so each physical trim edge
+     * is counted exactly once. Each kept segment is attributed to the first cutout that
+     * owns it, preserving per-cutout `effectivePerimeter2DMeters` diagnostics.
+     */
+    private fun computeEffectiveCutoutPerimeters(
+        parent: List<Vec2>,
+        cutouts: List<List<Vec2>>
+    ): List<Double> {
+        if (cutouts.isEmpty()) return emptyList()
+        val perimeters = DoubleArray(cutouts.size)
+        val keptSegments = ArrayList<Pair<Vec2, Vec2>>()
+
+        for ((ownerIndex, cutout) in cutouts.withIndex()) {
+            for (i in cutout.indices) {
+                val start = cutout[i]
+                val end = cutout[(i + 1) % cutout.size]
+                val cuts = ArrayList<Double>(4)
+                cuts.add(0.0)
+                cuts.add(1.0)
+                for (j in parent.indices) {
+                    segmentIntersectionParameter(
+                        start, end,
+                        parent[j], parent[(j + 1) % parent.size]
+                    )?.let(cuts::add)
+                }
+                for ((siblingIndex, sibling) in cutouts.withIndex()) {
+                    if (siblingIndex == ownerIndex) continue
+                    for (j in sibling.indices) {
+                        segmentIntersectionParameter(
+                            start, end,
+                            sibling[j], sibling[(j + 1) % sibling.size]
+                        )?.let(cuts::add)
+                    }
+                }
+                val sorted = cuts.sorted()
+                for (k in 0 until sorted.size - 1) {
+                    val t0 = sorted[k]
+                    val t1 = sorted[k + 1]
+                    if (t1 - t0 <= 1e-9) continue
+                    val a = start.lerp(end, t0)
+                    val b = start.lerp(end, t1)
+                    if (a.distanceTo(b) <= 1e-7) continue
+                    val midpoint = start.lerp(end, (t0 + t1) * 0.5)
+                    if (!isInsideOrOnBoundary(parent, midpoint)) continue
+                    val insideOther = cutouts.indices.any { otherIndex ->
+                        otherIndex != ownerIndex &&
+                            isStrictlyInside(cutouts[otherIndex], midpoint)
+                    }
+                    if (insideOther) continue
+                    val duplicate = keptSegments.any { existing ->
+                        (existing.first.approxEquals(a, 1e-6) && existing.second.approxEquals(b, 1e-6)) ||
+                            (existing.first.approxEquals(b, 1e-6) && existing.second.approxEquals(a, 1e-6))
+                    }
+                    if (duplicate) continue
+                    keptSegments.add(a to b)
+                    perimeters[ownerIndex] += a.distanceTo(b)
+                }
+            }
+        }
+        return perimeters.toList()
+    }
+
+    /**
+     * Boundary-aware containment where the edge-distance tolerance takes precedence over
+     * the ray-cast result, so points exactly on an edge are always treated as contained.
+     */
+    private fun isInsideOrOnBoundary(polygon: List<Vec2>, point: Vec2): Boolean {
+        for (i in polygon.indices) {
+            if (PolygonClipping2D.pointToSegmentDistance(
+                    point, polygon[i], polygon[(i + 1) % polygon.size]
+                ) <= 1e-6
+            ) {
+                return true
+            }
+        }
+        return PolygonClipping2D.containsPoint(polygon, point, includeBoundary = true)
+    }
+
+    /**
+     * Strict interior test: points on (or within tolerance of) the boundary are NOT inside,
+     * so an edge shared with a sibling cutout is retained rather than discarded.
+     */
+    private fun isStrictlyInside(polygon: List<Vec2>, point: Vec2): Boolean {
+        for (i in polygon.indices) {
+            if (PolygonClipping2D.pointToSegmentDistance(
+                    point, polygon[i], polygon[(i + 1) % polygon.size]
+                ) <= 1e-6
+            ) {
+                return false
+            }
+        }
+        return PolygonClipping2D.containsPoint(polygon, point, includeBoundary = false)
+    }
+
+    /**
+     * Returns parameter `t` along segment `[a1, a2]` where it crosses segment `[b1, b2]`,
+     * or null when the segments do not properly cross (parallel/collinear included).
+     */
+    private fun segmentIntersectionParameter(
+        a1: Vec2,
+        a2: Vec2,
+        b1: Vec2,
+        b2: Vec2
+    ): Double? {
+        val r = a2 - a1
+        val s = b2 - b1
+        val denom = r.cross(s)
+        if (abs(denom) <= 1e-12) return null
+        val t = (b1 - a1).cross(s) / denom
+        val u = (b1 - a1).cross(r) / denom
+        return if (t in 0.0..1.0 && u in 0.0..1.0) t else null
+    }
+
+    /**
+     * Sums the horizontal widths of door thresholds that sit on the parent surface's own
+     * bottom boundary, so flooring baseboard runs skip real doorways. Elevated interior
+     * door-shaped cutouts (e.g., pass-throughs) do not reduce baseboard.
+     */
+    private fun computeDoorOpeningWidth(
+        cutouts: List<AnalyzedCutout>,
+        parentMinV: Double
+    ): Double {
+        var total = 0.0
+        for (cutout in cutouts) {
+            if (cutout.kind != CutoutKind.DOOR) continue
+            val minV = cutout.vertices2D.minOf { it.v }
+            if (abs(minV - parentMinV) > DOOR_FLUSH_TOLERANCE_METERS) continue
+            for (i in cutout.vertices2D.indices) {
+                val a = cutout.vertices2D[i]
+                val b = cutout.vertices2D[(i + 1) % cutout.vertices2D.size]
+                val isThresholdEdge = abs(a.v - minV) <= DOOR_FLUSH_TOLERANCE_METERS &&
+                    abs(b.v - minV) <= DOOR_FLUSH_TOLERANCE_METERS
+                if (isThresholdEdge) {
+                    total += abs(b.u - a.u)
+                }
+            }
+        }
+        return total
     }
 }
