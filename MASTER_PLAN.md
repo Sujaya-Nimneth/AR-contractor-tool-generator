@@ -1,6 +1,6 @@
 # AR Contractor Quote & Material Estimation App — Master Engineering Plan
 
-> **Architecture Status:** **Phase 8 Complete & Verified** (`:core-domain:test`, `:app:testDebugUnitTest`, `:app:lintDebug` green) — **Multi-Project & Currency Complete** (see `IMPROVEMENT_PLAN.md`)
+> **Architecture Status:** **Phase 9 Complete & Verified** (`:core-domain:test` 40/40, `:app:testDebugUnitTest` 79/79, `:app:lintDebug`, `:app:assembleDebug`, `:app:assembleRelease`, `:app:compileDebugAndroidTestKotlin` green) — **Polish & Hardening Complete** (see `IMPROVEMENT_PLAN.md`)
 > **Target Platform:** Native Android (Min SDK 26 / Target SDK 35 / Compile SDK 36, Kotlin 2.2.0, Jetpack Compose Material 3)  
 > **Offline Guarantee:** 100% On-Device Spatial Math, Room Persistence, and Vector `PdfDocument` Generation (Zero Cloud Dependencies)
 
@@ -179,6 +179,16 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
 - [x] All UI money (`formatMoney`/`formatRate`, totals, surface rows, pricing panel, catalog) renders the project currency
 - [x] Every PDF money value (cover hero, breakdown, summary tables, blueprint facts, line items, totals, acceptance) uses `workspace.project.currencyCode`
 - [x] Tests: project lifecycle (create/switch/delete/last-guard), currency propagation, symbol formatting, schema migration
+
+### Phase 9: Polish & Hardening *(Complete & Verified)*
+- [x] GitHub Actions CI: JDK 21, domain tests + app unit tests + lint + debug APK, failure-report artifacts
+- [x] Single startup bootstrap owner (`QuoteViewModel`); removed racing `AppContainer.initialize`
+- [x] Shared `CoplanarityConfig.MEASUREMENT_STANDARD` across reticle, state machine, and saved-surface reconstruction
+- [x] AR hot-path: sub-millimeter reticle updates suppressed (no per-frame UiState churn); 64-corner polygon cap with split-surface guidance
+- [x] Metric/imperial display toggle for all quote area/perimeter readouts (storage stays SI; PDFs keep dual units)
+- [x] Test gaps closed: `MeasurementStateCodec` round-trips + corrupt payloads, tax allocation edges (empty/single/tied-remainder/0%/100%)
+- [x] Repo hygiene verified: no tracked `.DS_Store`/`local.properties`; LICENSE still pending owner decision
+- [ ] Post-save vertex nudging in the quote workspace (deferred; manual re-entry + AR re-measure cover corrections today)
 
 ---
 

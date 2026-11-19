@@ -10,6 +10,7 @@ An offline-first Android app for measuring contractor surfaces in AR, estimating
 - Room-backed projects, surfaces, cutouts, editable contractor branding, and a seeded material catalog.
 - Multiple projects with a switcher: each keeps its own surfaces, client, tax policy, and ISO 4217 currency; every UI total and PDF figure renders in the project currency.
 - Responsive Jetpack Compose quote workspace with material, waste, labor, and tax controls.
+- Metric/imperial display toggle for quote measurements; storage and pricing stay SI.
 - Native A4 and US Letter vector PDF exports with contractor branding, hatched blueprints, dimension callouts, itemized pricing, terms, and a signature block.
 - Private, revisioned PDF storage exposed to the Android share sheet through a read-only `FileProvider`.
 - Deterministic project-level tax allocation, paginated surface summaries, and local data excluded from Android backups.
@@ -44,6 +45,8 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ```
 
 ## Build And Test
+
+GitHub Actions runs the domain tests, app unit tests, lint, and debug assembly on every push and pull request (JDK 21).
 
 ```bash
 # Domain tests, Android JVM tests, and app compilation

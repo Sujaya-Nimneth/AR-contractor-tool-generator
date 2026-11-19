@@ -72,24 +72,25 @@ The codebase is in genuinely good shape: the pure-JVM boundary holds, geometry m
 2. [x] Per-project `currencyCode` (Room v3 + `MIGRATION_2_3` + Robolectric migration test); all UI and PDF money renders the project currency; ISO 4217 validation.
 - **Exit met:** migration test green, quote numbers/filenames already project-scoped, `:core-domain:test` (35), `:app:testDebugUnitTest` (73), `:app:lintDebug` green.
 
-### Phase 9 — Polish & Hardening (B4, C1, C2, C4–C8)
-1. CI workflow (GitHub Actions): JDK 21, `:core-domain:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`.
-2. Single startup bootstrap owner (drop `AppContainer.initialize` duplication or make ViewModel await it).
-3. Shared coplanarity config constant; document locked-normal behavior.
-4. AR hot-path allocation trim (reuse snapshot when reticle unchanged beyond epsilon) + vertex-count guard with a friendly message.
-5. Post-save vertex nudging / cutout editing in quote workspace; imperial display toggle.
-6. Add LICENSE (owner decision needed), remove `.DS_Store`, confirm `local.properties` ignored.
-7. Close remaining C7 test gaps (`MeasurementStateCodec` round-trip, `allocateTax` edges).
-- **Exit:** full verification suite from `MASTER_PLAN.md` §7A green.
+### Phase 9 — Polish & Hardening (B4, C1, C2, C4–C8) · ✅ COMPLETE (2026-11-19, one item deferred)
+1. [x] CI workflow (GitHub Actions): JDK 21, domain + app tests, lint, debug APK, failure artifacts.
+2. [x] Single startup bootstrap owner; racing `AppContainer.initialize` removed.
+3. [x] Shared `CoplanarityConfig.MEASUREMENT_STANDARD` (6 cm) across all three gates.
+4. [x] Sub-millimeter reticle update suppression + 64-corner polygon cap with guidance.
+5. [x] Imperial display toggle (m²/ft² chips). ⏸ Post-save vertex nudging deferred — manual re-entry and AR re-measure already cover corrections; nudging needs a 2D editor design decision.
+6. [x] `.DS_Store`/`local.properties` confirmed untracked. ⏸ LICENSE awaiting owner decision (#1 below).
+7. [x] `MeasurementStateCodec` round-trip/corruption tests + `allocateTax` edge tests.
+- **Exit met:** `:core-domain:test` (40), `:app:testDebugUnitTest` (79), `:app:lintDebug`, `:app:assembleDebug`, `:app:assembleRelease`, `:app:compileDebugAndroidTestKotlin` all green.
 
 ### Sequencing rationale
 Phase 6 first because it changes *money on client invoices* with the smallest diff. Phase 7 next because it unlocks the largest user population (non-AR devices) and removes the data-loss trap. Phases 8–9 are additive and safe to defer.
 
 ---
 
-## 3. Open Decisions (need owner input before the relevant phase)
+## 3. Open Decisions (remaining owner input)
 
-1. **License choice** (C8) — MIT/Apache-2.0/proprietary?
-2. **Currency scope** (B3) — single per-project currency vs. per-line? (Recommend per-project.)
-3. **Trim deduction rules** (A2) — confirm trade practice: deduct door width from baseboard? Tape around windows only, or windows + doors?
-4. **Multi-project UX** (B2) — is a project switcher sufficient, or is client-level grouping wanted?
+1. **License choice** (C8) — MIT/Apache-2.0/proprietary? Still open; blocks public distribution.
+2. ~~Currency scope~~ — resolved: per-project ISO 4217 code (Phase 8).
+3. **Trim deduction rules** (A2) — implemented default: floor-flush door widths deducted from baseboard; tape/trim on all effective opening perimeters. Confirm or refine per-kind opt-outs.
+4. ~~Multi-project UX~~ — resolved: project switcher (Phase 8); client-level grouping can be added later if needed.
+5. **Vertex nudging editor** (B4, deferred) — is a 2D drag editor for saved surfaces worth building, given manual re-entry + AR re-measure exist?
