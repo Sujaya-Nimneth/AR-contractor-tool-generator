@@ -48,6 +48,7 @@ import java.util.Locale
 fun SurfacePricingPanel(
     surface: SurfaceQuoteLine,
     materials: List<MaterialSpec>,
+    currencyCode: String = "USD",
     onAction: (QuoteAction) -> Unit,
     onRemeasure: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -91,7 +92,7 @@ fun SurfacePricingPanel(
                 }
                 surface.estimate?.let {
                     Text(
-                        text = formatMoney(it.grandTotal),
+                        text = formatMoney(it.grandTotal, currencyCode),
                         style = numericTextStyle.copy(fontWeight = FontWeight.SemiBold),
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -193,7 +194,7 @@ fun SurfacePricingPanel(
                                     )
                                     Text(
                                         text = "${material.tradeType.shortName()} · " +
-                                            "${formatRate(material.unitCost, material.primaryUnitType.singular)}",
+                                            "${formatRate(material.unitCost, material.primaryUnitType.singular, currencyCode)}",
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
@@ -286,7 +287,8 @@ fun SurfacePricingPanel(
                 Text(
                     text = formatRate(
                         laborSliderValue.toDouble(),
-                        surface.effectiveMaterial.pricingAreaUnit.symbol
+                        surface.effectiveMaterial.pricingAreaUnit.symbol,
+                        currencyCode
                     ),
                     style = numericTextStyle,
                     color = MaterialTheme.colorScheme.onSurface
@@ -382,7 +384,7 @@ fun SurfacePricingPanel(
                                 )
                             }
                             Text(
-                                text = formatMoney(item.lineTotal),
+                                text = formatMoney(item.lineTotal, currencyCode),
                                 style = numericTextStyle,
                                 color = MaterialTheme.colorScheme.onSurface
                             )

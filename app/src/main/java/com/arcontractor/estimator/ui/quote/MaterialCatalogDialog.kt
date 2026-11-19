@@ -104,6 +104,7 @@ fun MaterialCatalogDialog(
                 if (editor == null) {
                     CatalogList(
                         materials = state.workspace?.materials.orEmpty(),
+                        currencyCode = state.workspace?.project?.currencyCode ?: "USD",
                         onAction = onAction
                     )
                 } else {
@@ -207,6 +208,7 @@ private fun CatalogMessage(
 @Composable
 private fun CatalogList(
     materials: List<MaterialSpec>,
+    currencyCode: String,
     onAction: (QuoteAction) -> Unit
 ) {
     LazyColumn(
@@ -251,6 +253,7 @@ private fun CatalogList(
             items(materials, key = MaterialSpec::id) { material ->
                 CatalogMaterialRow(
                     material = material,
+                    currencyCode = currencyCode,
                     onClick = {
                         onAction(QuoteAction.EditCatalogMaterial(material.id))
                     }
@@ -263,6 +266,7 @@ private fun CatalogList(
 @Composable
 private fun CatalogMaterialRow(
     material: MaterialSpec,
+    currencyCode: String,
     onClick: () -> Unit
 ) {
     Surface(
@@ -292,7 +296,7 @@ private fun CatalogMaterialRow(
                     )
                 }
                 Text(
-                    text = formatMoney(java.math.BigDecimal.valueOf(material.unitCost)),
+                    text = formatMoney(java.math.BigDecimal.valueOf(material.unitCost), currencyCode),
                     style = numericTextStyle.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -321,7 +325,8 @@ private fun CatalogMaterialRow(
                     label = "Labor",
                     value = formatRate(
                         material.laborRatePerUnitArea,
-                        material.pricingAreaUnit.symbol
+                        material.pricingAreaUnit.symbol,
+                        currencyCode
                     ),
                     modifier = Modifier.weight(1.3f)
                 )

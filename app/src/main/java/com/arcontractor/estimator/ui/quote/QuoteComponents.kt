@@ -23,10 +23,21 @@ import androidx.compose.ui.unit.dp
 import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
+import java.util.Currency
+import java.util.concurrent.ConcurrentHashMap
 
-private val currencyFormatter = NumberFormat.getCurrencyInstance(Locale.US)
+private val currencyFormatters = ConcurrentHashMap<String, NumberFormat>()
 
-fun formatMoney(value: BigDecimal): String = currencyFormatter.format(value)
+fun formatMoney(value: BigDecimal, currencyCode: String = "USD"): String {
+    val formatter = currencyFormatters.getOrPut(currencyCode) {
+        NumberFormat.getCurrencyInstance(Locale.US).apply {
+            runCatching { currency = Currency.getInstance(currencyCode) }
+            maximumFractionDigits = 2
+            minimumFractionDigits = 2
+        }
+    }
+    return formatter.format(value)
+}
 
 fun formatArea(squareMeters: Double): String =
     String.format(Locale.US, "%.2f m²", squareMeters)
@@ -37,8 +48,8 @@ fun formatAreaCompact(squareMeters: Double): String =
 fun formatPercent(fraction: Double): String =
     String.format(Locale.US, "%.1f%%", fraction * 100.0)
 
-fun formatRate(rate: Double, unit: String): String =
-    String.format(Locale.US, "$%.2f / %s", rate, unit)
+fun formatRate(rate: Double, unit: String, currencyCode: String = "USD"): String =
+    "${formatMoney(BigDecimal.valueOf(rate), currencyCode)} / $unit"
 
 val numericTextStyle: TextStyle
     @Composable get() = MaterialTheme.typography.bodyMedium.copy(

@@ -255,6 +255,7 @@ private fun QuoteWorkspace(
                         SurfaceLedgerRow(
                             surface = surface,
                             isSelected = surface.surfaceId == state.selectedSurfaceId,
+                            currencyCode = workspace.project.currencyCode,
                             onClick = {
                                 onAction(QuoteAction.SelectSurface(surface.surfaceId))
                             }
@@ -268,6 +269,7 @@ private fun QuoteWorkspace(
                         SurfacePricingPanel(
                             surface = selectedSurface,
                             materials = workspace.materials,
+                            currencyCode = workspace.project.currencyCode,
                             onAction = onAction,
                             onRemeasure = { onRemeasureSurface(selectedSurface.surfaceId) },
                             modifier = Modifier.padding(top = 14.dp)
@@ -278,6 +280,7 @@ private fun QuoteWorkspace(
                 item {
                     QuoteTotalsCard(
                         quote = workspace.quote,
+                        currencyCode = workspace.project.currencyCode,
                         modifier = Modifier.padding(top = 30.dp)
                     )
                 }
@@ -513,6 +516,7 @@ private fun QuoteOverview(
                 QuoteTotalCard(
                     quote = workspace.quote,
                     surfaceCount = workspace.surfaces.size,
+                    currencyCode = workspace.project.currencyCode,
                     modifier = Modifier.weight(1.08f)
                 )
                 CoverageLedger(
@@ -527,7 +531,8 @@ private fun QuoteOverview(
             Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
                 QuoteTotalCard(
                     quote = workspace.quote,
-                    surfaceCount = workspace.surfaces.size
+                    surfaceCount = workspace.surfaces.size,
+                    currencyCode = workspace.project.currencyCode
                 )
                 CoverageLedger(
                     workspace = workspace,
@@ -544,6 +549,7 @@ private fun QuoteOverview(
 private fun QuoteTotalCard(
     quote: ProjectQuoteSummary,
     surfaceCount: Int,
+    currencyCode: String,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -564,7 +570,7 @@ private fun QuoteTotalCard(
                 letterSpacing = 1.2.sp
             )
             Text(
-                text = formatMoney(quote.grandTotal),
+                text = formatMoney(quote.grandTotal, currencyCode),
                 modifier = Modifier.padding(top = 5.dp),
                 color = MaterialTheme.colorScheme.onSurface,
                 fontFamily = FontFamily.Monospace,
@@ -584,12 +590,12 @@ private fun QuoteTotalCard(
                 modifier = Modifier.padding(vertical = 14.dp),
                 color = MaterialTheme.colorScheme.outlineVariant
             )
-            LedgerValueRow("Materials", formatMoney(quote.materialSubtotal))
-            LedgerValueRow("Consumables", formatMoney(quote.consumablesSubtotal))
-            LedgerValueRow("Labor", formatMoney(quote.laborSubtotal))
+            LedgerValueRow("Materials", formatMoney(quote.materialSubtotal, currencyCode))
+            LedgerValueRow("Consumables", formatMoney(quote.consumablesSubtotal, currencyCode))
+            LedgerValueRow("Labor", formatMoney(quote.laborSubtotal, currencyCode))
             LedgerValueRow(
                 label = "Tax · ${formatPercent(quote.taxRate)}",
-                value = formatMoney(quote.taxAmount)
+                value = formatMoney(quote.taxAmount, currencyCode)
             )
             HorizontalDivider(
                 modifier = Modifier.padding(top = 8.dp),
@@ -597,7 +603,7 @@ private fun QuoteTotalCard(
             )
             LedgerValueRow(
                 label = "Quoted total",
-                value = formatMoney(quote.grandTotal),
+                value = formatMoney(quote.grandTotal, currencyCode),
                 emphasized = true
             )
         }
@@ -758,6 +764,7 @@ private fun CoverageLedgerRow(
 private fun SurfaceLedgerRow(
     surface: SurfaceQuoteLine,
     isSelected: Boolean,
+    currencyCode: String,
     onClick: () -> Unit
 ) {
     val estimate = surface.estimate
@@ -834,7 +841,7 @@ private fun SurfaceLedgerRow(
             }
             Column(horizontalAlignment = Alignment.End) {
                 Text(
-                    text = estimate?.grandTotal?.let(::formatMoney) ?: "—",
+                    text = estimate?.grandTotal?.let { formatMoney(it, currencyCode) } ?: "—",
                     style = numericTextStyle.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -854,6 +861,7 @@ private fun SurfaceLedgerRow(
 @Composable
 private fun QuoteTotalsCard(
     quote: ProjectQuoteSummary,
+    currencyCode: String,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -888,13 +896,13 @@ private fun QuoteTotalsCard(
                 modifier = Modifier.padding(vertical = 9.dp),
                 color = MaterialTheme.colorScheme.outlineVariant
             )
-            LedgerValueRow("Material packages", formatMoney(quote.materialSubtotal))
-            LedgerValueRow("Trade consumables", formatMoney(quote.consumablesSubtotal))
-            LedgerValueRow("Labor", formatMoney(quote.laborSubtotal))
-            LedgerValueRow("Subtotal before tax", formatMoney(quote.subtotalBeforeTax))
+            LedgerValueRow("Material packages", formatMoney(quote.materialSubtotal, currencyCode))
+            LedgerValueRow("Trade consumables", formatMoney(quote.consumablesSubtotal, currencyCode))
+            LedgerValueRow("Labor", formatMoney(quote.laborSubtotal, currencyCode))
+            LedgerValueRow("Subtotal before tax", formatMoney(quote.subtotalBeforeTax, currencyCode))
             LedgerValueRow(
                 "Tax · ${formatPercent(quote.taxRate)}",
-                formatMoney(quote.taxAmount)
+                formatMoney(quote.taxAmount, currencyCode)
             )
             HorizontalDivider(
                 modifier = Modifier.padding(top = 8.dp),
@@ -902,7 +910,7 @@ private fun QuoteTotalsCard(
             )
             LedgerValueRow(
                 label = "Client total",
-                value = formatMoney(quote.grandTotal),
+                value = formatMoney(quote.grandTotal, currencyCode),
                 emphasized = true
             )
         }
