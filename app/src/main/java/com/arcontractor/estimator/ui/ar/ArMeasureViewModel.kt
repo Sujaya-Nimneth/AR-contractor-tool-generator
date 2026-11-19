@@ -90,10 +90,29 @@ class ArMeasureViewModel(
             validated?.isStableForLock == true -> ArMeasurePhase.LOCKING_PLANE
             else -> ArMeasurePhase.SCANNING
         }
+        if (nextPhase == current.phase &&
+            isReticleEquivalent(current.reticleSample, validated)
+        ) {
+            return
+        }
         _uiState.value = current.copy(
             phase = nextPhase,
             reticleSample = validated
         )
+    }
+
+    /**
+     * Suppresses per-frame state churn when the smoothed reticle has not moved meaningfully,
+     * keeping Compose recomposition and scene-preview work off the 30-60 fps hot path.
+     */
+    private fun isReticleEquivalent(previous: ReticleSample?, next: ReticleSample?): Boolean {
+        if (previous == null || next == null) return previous == null && next == null
+        return previous.source == next.source &&
+            previous.isStableForLock == next.isStableForLock &&
+            previous.coplanarity?.isCoplanar == next.coplanarity?.isCoplanar &&
+            previous.coplanarity?.rejectionReason == next.coplanarity?.rejectionReason &&
+            previous.pose.position.distanceTo(next.pose.position) < RETICLE_UPDATE_EPSILON_METERS &&
+            previous.pose.normal.dot(next.pose.normal) > 1.0 - 1e-6
     }
 
     private fun updateTracking(action: ArMeasureAction.TrackingChanged) {
@@ -540,6 +559,7 @@ class ArMeasureViewModel(
         const val MAX_HISTORY_DEPTH = 50
         const val MIN_VERTEX_SEPARATION_METERS = 0.005
         const val MAX_POLYGON_VERTICES = 64
+        const val RETICLE_UPDATE_EPSILON_METERS = 0.001
         const val KEY_MEASUREMENT_DRAFT = "ar_measurement_draft"
     }
 }
