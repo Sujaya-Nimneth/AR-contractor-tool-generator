@@ -468,6 +468,26 @@ class QuoteViewModelTest {
         assertEquals("LKR", viewModel.uiState.value.workspace?.project?.currencyCode)
     }
 
+    @Test
+    fun `display unit toggle switches between metric and imperial`() = runTest {
+        val viewModel = createViewModel()
+        assertEquals(DisplayUnitSystem.METRIC, viewModel.uiState.value.displayUnits)
+
+        viewModel.onAction(QuoteAction.SetDisplayUnits(DisplayUnitSystem.IMPERIAL))
+        assertEquals(DisplayUnitSystem.IMPERIAL, viewModel.uiState.value.displayUnits)
+
+        viewModel.onAction(QuoteAction.SetDisplayUnits(DisplayUnitSystem.METRIC))
+        assertEquals(DisplayUnitSystem.METRIC, viewModel.uiState.value.displayUnits)
+    }
+
+    @Test
+    fun `area and length formatters convert to imperial display units`() {
+        assertEquals("10.00 m²", formatArea(10.0))
+        assertEquals("107.6 ft²", formatArea(10.0, DisplayUnitSystem.IMPERIAL))
+        assertEquals("2.44 m", formatLength(2.4384))
+        assertEquals("8' 0\"", formatLength(2.4384, DisplayUnitSystem.IMPERIAL))
+    }
+
     private fun createViewModel(
         exporter: QuotePdfExporter = RecordingQuotePdfExporter()
     ): QuoteViewModel {
