@@ -33,8 +33,31 @@ object PdfQuoteFormat {
         return "quote-$slug-${quoteDate.format(DateTimeFormatter.ISO_LOCAL_DATE)}-$revision.pdf"
     }
 
-    fun money(value: BigDecimal): String =
-        String.format(Locale.US, "$%,.2f", value)
+    fun money(value: BigDecimal, currencyCode: String = "USD"): String {
+        val symbol = currencySymbol(currencyCode)
+        return if (symbol.length == 1) {
+            String.format(Locale.US, "$symbol%,.2f", value)
+        } else {
+            String.format(Locale.US, "%s %,.2f", symbol, value)
+        }
+    }
+
+    fun currencySymbol(currencyCode: String): String = when (currencyCode.uppercase(Locale.US)) {
+        "USD" -> "$"
+        "EUR" -> "€"
+        "GBP" -> "£"
+        "JPY" -> "¥"
+        "INR" -> "₹"
+        "CAD" -> "CA$"
+        "AUD" -> "A$"
+        "NZD" -> "NZ$"
+        "SGD" -> "S$"
+        "CHF" -> "CHF"
+        "LKR" -> "Rs"
+        "AED" -> "AED"
+        "ZAR" -> "R"
+        else -> currencyCode.uppercase(Locale.US)
+    }
 
     fun quantity(value: Double): String =
         if (kotlin.math.abs(value - value.toLong()) < 1e-9) {

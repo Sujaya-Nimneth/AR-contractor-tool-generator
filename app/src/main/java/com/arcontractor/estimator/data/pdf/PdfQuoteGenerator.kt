@@ -236,6 +236,7 @@ class PdfQuoteGenerator(
         drawBreakdownPanel(
             canvas = canvas,
             quote = context.workspace.quote,
+            currencyCode = context.currencyCode,
             left = margin,
             top = y,
             width = columnWidth,
@@ -261,6 +262,7 @@ class PdfQuoteGenerator(
         drawSurfaceSummaryTable(
             canvas = canvas,
             surfaces = spec.surfaces,
+            currencyCode = context.currencyCode,
             left = margin,
             top = y,
             width = width - margin * 2f,
@@ -290,6 +292,7 @@ class PdfQuoteGenerator(
         drawSurfaceSummaryTable(
             canvas = canvas,
             surfaces = spec.surfaces,
+            currencyCode = context.currencyCode,
             left = MARGIN,
             top = y + 30f,
             width = context.width - MARGIN * 2f,
@@ -316,7 +319,7 @@ class PdfQuoteGenerator(
         val baseline = top + 20f
         canvas.drawText("CURRENT TOTAL", margin + 16f, baseline, labelPaint(7.8f, MUTED_INK))
         canvas.drawText(
-            PdfQuoteFormat.money(context.workspace.quote.grandTotal),
+            PdfQuoteFormat.money(context.workspace.quote.grandTotal, context.currencyCode),
             margin + 16f,
             top + 56f,
             moneyPaint(30f, INK)
@@ -383,6 +386,7 @@ class PdfQuoteGenerator(
     private fun drawBreakdownPanel(
         canvas: Canvas,
         quote: ProjectQuoteSummary,
+        currencyCode: String,
         left: Float,
         top: Float,
         width: Float,
@@ -393,13 +397,13 @@ class PdfQuoteGenerator(
         canvas.drawRect(rect, linePaint(0.7f, LINE))
         canvas.drawText("QUOTE BREAKDOWN", left + 12f, top + 17f, labelPaint(7.4f, INK))
         var y = top + 35f
-        y = drawKeyValue(canvas, "Materials", PdfQuoteFormat.money(quote.materialSubtotal), left, y, width)
-        y = drawKeyValue(canvas, "Consumables", PdfQuoteFormat.money(quote.consumablesSubtotal), left, y, width)
-        y = drawKeyValue(canvas, "Labor", PdfQuoteFormat.money(quote.laborSubtotal), left, y, width)
+        y = drawKeyValue(canvas, "Materials", PdfQuoteFormat.money(quote.materialSubtotal, currencyCode), left, y, width)
+        y = drawKeyValue(canvas, "Consumables", PdfQuoteFormat.money(quote.consumablesSubtotal, currencyCode), left, y, width)
+        y = drawKeyValue(canvas, "Labor", PdfQuoteFormat.money(quote.laborSubtotal, currencyCode), left, y, width)
         y = drawKeyValue(
             canvas,
             "Tax (${String.format(Locale.US, "%.1f%%", quote.taxRate * 100.0)})",
-            PdfQuoteFormat.money(quote.taxAmount),
+            PdfQuoteFormat.money(quote.taxAmount, currencyCode),
             left,
             y,
             width
@@ -408,7 +412,7 @@ class PdfQuoteGenerator(
         drawKeyValue(
             canvas,
             "Total",
-            PdfQuoteFormat.money(quote.grandTotal),
+            PdfQuoteFormat.money(quote.grandTotal, currencyCode),
             left,
             y + 7f,
             width,
@@ -474,6 +478,7 @@ class PdfQuoteGenerator(
     private fun drawSurfaceSummaryTable(
         canvas: Canvas,
         surfaces: List<SurfaceQuoteLine>,
+        currencyCode: String,
         left: Float,
         top: Float,
         width: Float,
@@ -526,7 +531,7 @@ class PdfQuoteGenerator(
             )
             drawRightAlignedText(
                 canvas,
-                surface.estimate?.grandTotal?.let(PdfQuoteFormat::money) ?: "-",
+                surface.estimate?.grandTotal?.let { PdfQuoteFormat.money(it, currencyCode) } ?: "-",
                 left + width,
                 y,
                 numberPaint(7.4f, INK)
@@ -584,20 +589,26 @@ class PdfQuoteGenerator(
 
         val summaryTop = drawingBounds.bottom + 15f
         val estimate = page.surface.estimate
-        drawBlueprintFact(canvas, margin, summaryTop, "SURFACE TOTAL", estimate?.grandTotal?.let(PdfQuoteFormat::money) ?: "-")
+        drawBlueprintFact(
+            canvas,
+            margin,
+            summaryTop,
+            "SURFACE TOTAL",
+            estimate?.grandTotal?.let { PdfQuoteFormat.money(it, context.currencyCode) } ?: "-"
+        )
         drawBlueprintFact(
             canvas,
             margin + 100f,
             summaryTop,
             "MATERIAL",
-            estimate?.materialSubtotal?.let(PdfQuoteFormat::money) ?: "-"
+            estimate?.materialSubtotal?.let { PdfQuoteFormat.money(it, context.currencyCode) } ?: "-"
         )
         drawBlueprintFact(
             canvas,
             margin + 200f,
             summaryTop,
             "LABOR",
-            estimate?.laborSubtotal?.let(PdfQuoteFormat::money) ?: "-"
+            estimate?.laborSubtotal?.let { PdfQuoteFormat.money(it, context.currencyCode) } ?: "-"
         )
         drawBlueprintFact(
             canvas,
@@ -687,6 +698,7 @@ class PdfQuoteGenerator(
             drawTableRow(
                 canvas = canvas,
                 row = row,
+                currencyCode = context.currencyCode,
                 margin = margin,
                 y = y,
                 surfaceWidth = surfaceWidth,
@@ -713,6 +725,7 @@ class PdfQuoteGenerator(
             drawLineItemTotals(
                 canvas = canvas,
                 quote = context.workspace.quote,
+                currencyCode = context.currencyCode,
                 left = margin,
                 top = y + 16f,
                 width = contentWidth
@@ -723,6 +736,7 @@ class PdfQuoteGenerator(
     private fun drawTableRow(
         canvas: Canvas,
         row: QuoteTableRow,
+        currencyCode: String,
         margin: Float,
         y: Float,
         surfaceWidth: Float,
@@ -765,14 +779,14 @@ class PdfQuoteGenerator(
         )
         drawRightAlignedText(
             canvas,
-            PdfQuoteFormat.money(row.item.unitPrice),
+            PdfQuoteFormat.money(row.item.unitPrice, currencyCode),
             unitPriceRight,
             y + 10f,
             numberPaint(7.1f, INK)
         )
         drawRightAlignedText(
             canvas,
-            PdfQuoteFormat.money(row.item.lineTotal),
+            PdfQuoteFormat.money(row.item.lineTotal, currencyCode),
             totalRight,
             y + 10f,
             numberPaint(7.1f, INK)
@@ -782,6 +796,7 @@ class PdfQuoteGenerator(
     private fun drawLineItemTotals(
         canvas: Canvas,
         quote: ProjectQuoteSummary,
+        currencyCode: String,
         left: Float,
         top: Float,
         width: Float
@@ -790,13 +805,13 @@ class PdfQuoteGenerator(
         var y = top
         canvas.drawLine(blockLeft, y, left + width, y, linePaint(0.9f, INK))
         y += 14f
-        y = drawKeyValue(canvas, "Materials", PdfQuoteFormat.money(quote.materialSubtotal), blockLeft, y, width * 0.48f)
-        y = drawKeyValue(canvas, "Consumables", PdfQuoteFormat.money(quote.consumablesSubtotal), blockLeft, y, width * 0.48f)
-        y = drawKeyValue(canvas, "Labor", PdfQuoteFormat.money(quote.laborSubtotal), blockLeft, y, width * 0.48f)
+        y = drawKeyValue(canvas, "Materials", PdfQuoteFormat.money(quote.materialSubtotal, currencyCode), blockLeft, y, width * 0.48f)
+        y = drawKeyValue(canvas, "Consumables", PdfQuoteFormat.money(quote.consumablesSubtotal, currencyCode), blockLeft, y, width * 0.48f)
+        y = drawKeyValue(canvas, "Labor", PdfQuoteFormat.money(quote.laborSubtotal, currencyCode), blockLeft, y, width * 0.48f)
         y = drawKeyValue(
             canvas,
             "Tax (${String.format(Locale.US, "%.1f%%", quote.taxRate * 100.0)})",
-            PdfQuoteFormat.money(quote.taxAmount),
+            PdfQuoteFormat.money(quote.taxAmount, currencyCode),
             blockLeft,
             y,
             width * 0.48f
@@ -805,7 +820,7 @@ class PdfQuoteGenerator(
         drawKeyValue(
             canvas,
             "QUOTED TOTAL",
-            PdfQuoteFormat.money(quote.grandTotal),
+            PdfQuoteFormat.money(quote.grandTotal, currencyCode),
             blockLeft,
             y + 9f,
             width * 0.48f,
@@ -851,7 +866,7 @@ class PdfQuoteGenerator(
         canvas.drawRect(box, linePaint(0.8f, LINE))
         canvas.drawText("CLIENT ACCEPTANCE", margin + 14f, acceptanceTop + 20f, labelPaint(7.5f, INK))
         canvas.drawText(
-            "Quoted total ${PdfQuoteFormat.money(context.workspace.quote.grandTotal)}",
+            "Quoted total ${PdfQuoteFormat.money(context.workspace.quote.grandTotal, context.currencyCode)}",
             margin + 14f,
             acceptanceTop + 39f,
             numberPaint(10f, INK)
@@ -1114,7 +1129,9 @@ class PdfQuoteGenerator(
         val validUntil: LocalDate,
         val pageNumber: Int,
         val pageCount: Int
-    )
+    ) {
+        val currencyCode: String get() = workspace.project.currencyCode
+    }
 
     private data class PagePlan(
         val quoteDate: LocalDate,
