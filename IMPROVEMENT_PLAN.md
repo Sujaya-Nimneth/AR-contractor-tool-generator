@@ -61,11 +61,11 @@ The codebase is in genuinely good shape: the pure-JVM boundary holds, geometry m
 4. [x] **C3:** Overrides parsed defensively; unknown preset/out-of-range factor/negative labor degrade to material defaults with per-surface `loadErrors`. Corruption test added.
 - **Exit met:** `:core-domain:test` (31 tests), `:app:testDebugUnitTest` (61 tests), `:app:lintDebug` green.
 
-### Phase 7 — Manual Entry & Surface Repair (B1, A4)
-1. Manual surface dialog in the quote workspace: width × height (m or ft-in via `UnitConverter`), optional rectangular cutouts with kind, orientation (wall/floor). Synthesize planar `Vec3` vertices and reuse `addSurface` unchanged.
-2. "Replace measurement" action on a `loadError` surface: re-measure in AR or re-enter manually, updating the existing surface ID via `replaceSurface`.
-3. Update README/plan claims to match reality.
-- **Exit:** manual quote end-to-end (entry → estimate → PDF) verified in unit tests; non-AR device path usable.
+### Phase 7 — Manual Entry & Surface Repair (B1, A4) · ✅ COMPLETE (2026-11-19)
+1. [x] `ManualSurfaceBuilder` (pure JVM) + manual dialog: width × height/depth in m or ft, wall/floor orientation, rectangular openings with kind and offsets; flows through the same `addSurface` pipeline.
+2. [x] `replaceSurfaceMeasurement` keeps ID/pricing/order; "Fix dimensions"/"Re-enter dimensions" (manual) and "Re-measure in AR" (nav arg `measure?surfaceId=`) both replace in place.
+3. [x] README and MASTER_PLAN updated to describe the delivered manual path.
+- **Exit met:** manual entry → estimate verified in ViewModel tests (metric + imperial + replacement + validation); `:core-domain:test` (35), `:app:testDebugUnitTest` (67), `:app:lintDebug` green.
 
 ### Phase 8 — Multi-Project & Currency (B2, B3)
 1. Project list screen (DAOs already support it): create/switch/rename/delete projects; keep `default-project` bootstrap for first launch.

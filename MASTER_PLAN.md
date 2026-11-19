@@ -1,6 +1,6 @@
 # AR Contractor Quote & Material Estimation App — Master Engineering Plan
 
-> **Architecture Status:** **Phase 6 Complete & Verified** (`:core-domain:test`, `:app:testDebugUnitTest`, `:app:lintDebug` green) — **Quote-Correctness Fixes Complete** (see `IMPROVEMENT_PLAN.md`)
+> **Architecture Status:** **Phase 7 Complete & Verified** (`:core-domain:test`, `:app:testDebugUnitTest`, `:app:lintDebug` green) — **Manual Entry & Surface Repair Complete** (see `IMPROVEMENT_PLAN.md`)
 > **Target Platform:** Native Android (Min SDK 26 / Target SDK 35 / Compile SDK 36, Kotlin 2.2.0, Jetpack Compose Material 3)  
 > **Offline Guarantee:** 100% On-Device Spatial Math, Room Persistence, and Vector `PdfDocument` Generation (Zero Cloud Dependencies)
 
@@ -161,6 +161,15 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
 - [x] Full 0–100% project tax range accepted end-to-end; out-of-range values rejected with a user-facing error instead of a silent 30% clamp; slider widened to 0–100%
 - [x] Invalid stored pricing overrides (unknown waste preset, out-of-range factor, negative labor) degrade to material defaults with per-surface `loadErrors` instead of crashing the workspace Flow
 - [x] Regression tests: overlapping/protruding/flush/disjoint cutout perimeters, door vs pass-through widths, door baseboard deduction, union trim billing, high & invalid tax rates, corrupt preset degradation
+
+### Phase 7: Manual Entry & Surface Repair *(Complete & Verified)*
+- [x] `domain.geometry.ManualSurfaceBuilder`: synthesizes planar wall/floor vertex rings and rectangular cutouts from typed dimensions (pure JVM, same analysis pipeline as AR)
+- [x] `replaceSurfaceMeasurement` repository operation preserving surface ID, material assignment, pricing overrides, and creation order
+- [x] Manual-entry dialog: metric/feet units, wall/floor orientation, named rectangular openings with kind + offsets, validation errors surfaced inline
+- [x] Quote header "Manual" action and empty-state "Enter dimensions" path so non-AR devices produce complete quotes
+- [x] Surface repair: "Fix dimensions" / "Re-enter dimensions" (manual) and "Re-measure in AR" (nav-arg targeted capture) replace broken or outdated measurements in place
+- [x] `MeasurementCapture.replaceSurfaceId` routes both AR and manual saves through in-place replacement
+- [x] Tests: manual wall/floor analysis parity, imperial conversion, replacement identity/pricing, invalid-input rejection, AR targeted replacement
 
 ---
 

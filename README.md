@@ -13,6 +13,8 @@ An offline-first Android app for measuring contractor surfaces in AR, estimating
 - Private, revisioned PDF storage exposed to the Android share sheet through a read-only `FileProvider`.
 - Deterministic project-level tax allocation, paginated surface summaries, and local data excluded from Android backups.
 - Optional ARCore declaration with runtime camera permission, installation prompts, depth fallback, and a manual-quote path on unsupported devices.
+- Typed-dimension manual surface entry (metric or feet) with rectangular door/window/vent openings — full quotes without an AR camera.
+- In-place surface repair: re-enter dimensions or re-measure in AR while keeping the material assignment, pricing overrides, and surface order.
 - In-progress AR drafts restored from `SavedStateHandle`, with persistence limited to structural edits and lifecycle boundaries.
 - Collision-safe, millisecond-revisioned private PDF exports with bounded cleanup of older quote files.
 
