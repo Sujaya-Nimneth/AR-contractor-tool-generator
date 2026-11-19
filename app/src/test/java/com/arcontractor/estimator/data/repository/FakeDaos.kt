@@ -84,6 +84,16 @@ class FakeSurfaceDao : SurfaceDao {
     val currentSurfaces: List<SurfaceWithCutouts>
         get() = surfaces.value
 
+    fun corruptWastePreset(surfaceId: String, presetName: String) {
+        surfaces.value = surfaces.value.map { stored ->
+            if (stored.surface.id == surfaceId) {
+                stored.copy(surface = stored.surface.copy(wastePresetOverride = presetName))
+            } else {
+                stored
+            }
+        }
+    }
+
     override fun observeForProject(projectId: String): Flow<List<SurfaceWithCutouts>> =
         surfaces.map { list ->
             list.filter { it.surface.projectId == projectId }

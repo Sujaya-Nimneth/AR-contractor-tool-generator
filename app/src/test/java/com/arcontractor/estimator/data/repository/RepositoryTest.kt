@@ -205,6 +205,37 @@ class RepositoryTest {
         assertEquals("GC-10482", workspace.project.contractorLicense)
     }
 
+    @Test
+    fun `unknown stored waste preset degrades to material default with a load error`() = runTest {
+        val fixtures = RepositoryFixtures()
+        val projectId = fixtures.projectRepository.ensureDefaultProject()
+        val surfaceId = fixtures.projectRepository.addSurface(
+            projectId = projectId,
+            draft = SurfaceMeasurementDraft(
+                name = "Corrupted preset wall",
+                outerVertices = RECTANGLE_6_SQ_METERS,
+                referenceNormal = Vec3(0.0, 0.0, 1.0),
+                cutouts = emptyList(),
+                materialId = DefaultMaterialCatalog.porcelainTile300x600Straight.id
+            )
+        )
+        fixtures.surfaceDao.corruptWastePreset(surfaceId, "PRESET_FROM_THE_FUTURE")
+
+        val workspace = fixtures.projectRepository.observeWorkspace(projectId)
+            .filterNotNull()
+            .first()
+
+        val surface = workspace.surfaces.single()
+        assertNotNull(surface.estimate)
+        assertEquals(
+            DefaultMaterialCatalog.porcelainTile300x600Straight.effectiveWasteFactor,
+            surface.effectiveMaterial.effectiveWasteFactor,
+            1e-9
+        )
+        assertTrue(workspace.loadErrors.any { it.contains("PRESET_FROM_THE_FUTURE") })
+        assertTrue(workspace.quote.grandTotal > BigDecimal.ZERO)
+    }
+
     private class RepositoryFixtures {
         val projectDao = FakeProjectDao()
         val surfaceDao = FakeSurfaceDao()
