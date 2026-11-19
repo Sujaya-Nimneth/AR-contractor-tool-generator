@@ -36,6 +36,7 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
@@ -94,6 +95,12 @@ fun QuoteScreen(
 
     if (state.isCatalogOpen) {
         MaterialCatalogDialog(
+            state = state,
+            onAction = viewModel::onAction
+        )
+    }
+    if (state.isManualEntryOpen) {
+        ManualSurfaceDialog(
             state = state,
             onAction = viewModel::onAction
         )
@@ -168,7 +175,8 @@ private fun QuoteWorkspace(
                 QuoteHeader(
                     projectName = workspace?.project?.name ?: "Untitled contractor quote",
                     onOpenCatalog = { onAction(QuoteAction.OpenCatalog) },
-                    onMeasureSurface = onMeasureSurface
+                    onMeasureSurface = onMeasureSurface,
+                    onManualEntry = { onAction(QuoteAction.OpenManualEntry()) }
                 )
             }
 
@@ -214,16 +222,24 @@ private fun QuoteWorkspace(
                     item {
                         EmptyLedgerPanel(
                             title = "No surfaces measured yet",
-                            body = "Walk the room once and save the first wall or floor. Its material, waste, and labor stay editable here.",
+                            body = "Walk the room once and save the first wall or floor, or type its dimensions manually. Material, waste, and labor stay editable here.",
                             action = {
-                                Button(
-                                    onClick = onMeasureSurface,
-                                    shape = RoundedCornerShape(6.dp),
-                                    colors = ButtonDefaults.buttonColors(
-                                        containerColor = MaterialTheme.colorScheme.primary
-                                    )
-                                ) {
-                                    Text("Measure first surface")
+                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                    Button(
+                                        onClick = onMeasureSurface,
+                                        shape = RoundedCornerShape(6.dp),
+                                        colors = ButtonDefaults.buttonColors(
+                                            containerColor = MaterialTheme.colorScheme.primary
+                                        )
+                                    ) {
+                                        Text("Measure first surface")
+                                    }
+                                    OutlinedButton(
+                                        onClick = { onAction(QuoteAction.OpenManualEntry()) },
+                                        shape = RoundedCornerShape(6.dp)
+                                    ) {
+                                        Text("Enter dimensions")
+                                    }
                                 }
                             }
                         )
@@ -328,7 +344,8 @@ private fun QuoteWorkspace(
 private fun QuoteHeader(
     projectName: String,
     onOpenCatalog: () -> Unit,
-    onMeasureSurface: () -> Unit
+    onMeasureSurface: () -> Unit,
+    onManualEntry: () -> Unit
 ) {
     Column {
         Row(
@@ -358,6 +375,9 @@ private fun QuoteHeader(
             }
             TextButton(onClick = onOpenCatalog) {
                 Text("Catalog")
+            }
+            TextButton(onClick = onManualEntry) {
+                Text("Manual")
             }
             Button(
                 onClick = onMeasureSurface,

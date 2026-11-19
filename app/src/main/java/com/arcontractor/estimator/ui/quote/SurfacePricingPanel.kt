@@ -407,6 +407,13 @@ fun SurfacePricingPanel(
                 ) {
                     Text("Remove surface")
                 }
+                TextButton(
+                    onClick = {
+                        onAction(QuoteAction.OpenManualEntry(surface.surfaceId))
+                    }
+                ) {
+                    Text(if (surface.loadError != null) "Fix dimensions" else "Re-enter dimensions")
+                }
                 Spacer(Modifier.weight(1f))
                 Text(
                     text = "Editable at any time",
