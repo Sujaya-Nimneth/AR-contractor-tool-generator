@@ -55,6 +55,16 @@ class PdfQuoteFormatTest {
     }
 
     @Test
+    fun `money formatting follows the project currency`() {
+        assertEquals("€1,234.50", PdfQuoteFormat.money(BigDecimal("1234.50"), "EUR"))
+        assertEquals("£980.00", PdfQuoteFormat.money(BigDecimal("980"), "GBP"))
+        assertEquals("Rs 45,000.00", PdfQuoteFormat.money(BigDecimal("45000"), "LKR"))
+        assertEquals("CA$77.25", PdfQuoteFormat.money(BigDecimal("77.25"), "CAD"))
+        assertEquals("SEK 10.00", PdfQuoteFormat.money(BigDecimal("10"), "SEK"))
+        assertEquals("$5.00", PdfQuoteFormat.money(BigDecimal("5"), "USD"))
+    }
+
+    @Test
     fun `line item pagination preserves order and produces an empty page when needed`() {
         val rows = (1..25).toList()
 

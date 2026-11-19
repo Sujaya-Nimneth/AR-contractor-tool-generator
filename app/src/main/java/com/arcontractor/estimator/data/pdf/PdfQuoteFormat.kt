@@ -35,7 +35,7 @@ object PdfQuoteFormat {
 
     fun money(value: BigDecimal, currencyCode: String = "USD"): String {
         val symbol = currencySymbol(currencyCode)
-        return if (symbol.length == 1) {
+        return if (symbol.endsWith("$") || symbol.length == 1) {
             String.format(Locale.US, "$symbol%,.2f", value)
         } else {
             String.format(Locale.US, "%s %,.2f", symbol, value)

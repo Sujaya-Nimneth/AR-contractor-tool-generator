@@ -393,6 +393,81 @@ class QuoteViewModelTest {
         assertEquals(65.0, replaced.effectiveMaterial.laborRatePerUnitArea, 1e-9)
     }
 
+    @Test
+    fun `creating a project switches to an empty workspace and keeps the old one`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.onAction(
+            QuoteAction.SaveMeasurement(
+                MeasurementCapture(
+                    outerVertices = RECTANGLE,
+                    referenceNormal = Vec3(0.0, 0.0, 1.0),
+                    cutouts = emptyList(),
+                    name = "Job A wall"
+                )
+            )
+        )
+        val originalProjectId = viewModel.uiState.value.projectId ?: error("Missing project")
+
+        viewModel.onAction(QuoteAction.OpenProjectSwitcher)
+        viewModel.onAction(QuoteAction.UpdateNewProjectName("Harbor Street job"))
+        viewModel.onAction(QuoteAction.CreateProject)
+
+        val state = viewModel.uiState.value
+        assertEquals(2, state.projects.size)
+        assertTrue(state.projectId != originalProjectId)
+        assertTrue(state.workspace?.surfaces.isNullOrEmpty())
+        assertEquals("Harbor Street job", state.workspace?.project?.name)
+        assertFalse(state.isProjectSwitcherOpen)
+
+        viewModel.onAction(QuoteAction.SwitchProject(originalProjectId))
+        val restored = viewModel.uiState.value
+        assertEquals(originalProjectId, restored.projectId)
+        assertEquals(1, restored.workspace?.surfaces?.size)
+        assertEquals("Job A wall", restored.workspace?.surfaces?.single()?.surfaceName)
+    }
+
+    @Test
+    fun `deleting the active project falls back to a remaining project`() = runTest {
+        val viewModel = createViewModel()
+        val firstProjectId = viewModel.uiState.value.projectId ?: error("Missing project")
+        viewModel.onAction(QuoteAction.UpdateNewProjectName("Second job"))
+        viewModel.onAction(QuoteAction.CreateProject)
+        val secondProjectId = viewModel.uiState.value.projectId ?: error("Missing second project")
+
+        viewModel.onAction(QuoteAction.DeleteProject(secondProjectId))
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.projects.size)
+        assertEquals(firstProjectId, state.projectId)
+        assertNotNull(state.workspace)
+    }
+
+    @Test
+    fun `the last remaining project cannot be deleted`() = runTest {
+        val viewModel = createViewModel()
+        val projectId = viewModel.uiState.value.projectId ?: error("Missing project")
+
+        viewModel.onAction(QuoteAction.DeleteProject(projectId))
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.projects.size)
+        assertTrue(state.message?.isError == true)
+    }
+
+    @Test
+    fun `project currency changes flow into the workspace`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.onAction(QuoteAction.OpenProjectDetails)
+        val draft = viewModel.uiState.value.projectDetailsDraft ?: error("Missing draft")
+        viewModel.onAction(
+            QuoteAction.UpdateProjectDetails(draft.copy(currencyCode = "LKR"))
+        )
+        viewModel.onAction(QuoteAction.SaveProjectDetails)
+
+        assertEquals("LKR", viewModel.uiState.value.workspace?.project?.currencyCode)
+    }
+
     private fun createViewModel(
         exporter: QuotePdfExporter = RecordingQuotePdfExporter()
     ): QuoteViewModel {
