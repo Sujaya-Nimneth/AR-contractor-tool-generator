@@ -54,12 +54,12 @@ The codebase is in genuinely good shape: the pure-JVM boundary holds, geometry m
 
 ## 2. Proposed Phases (execute one at a time, stop for review)
 
-### Phase 6 — Quote-Correctness Fixes (A1–A3, C3) · *highest priority, smallest scope*
-1. **A1:** Compute trim-driving perimeter from the *effective clipped* cutout geometry (union-aware), not raw perimeters. Keep raw perimeter available for diagnostics. Add domain tests: two overlapping windows, door flush + overshoot.
-2. **A2:** Thread `CutoutKind` into `MaterialEstimationEngine`: deduct door bottom-edge width from flooring baseboard; make edge-trim/J-bead/tape opt-out per kind where trade practice dictates. Document the rules in `MASTER_PLAN.md` §3.7. Unit tests per trade.
-3. **A3:** Remove the silent 30% clamp — validate `0–100%` in the UI with an explicit error message, matching the repository contract.
-4. **C3:** Move `applyOverrides` inside the guarded reconstruction block so a bad preset degrades to a single `loadError` line.
-- **Exit:** new regression tests + `:core-domain:test :app:testDebugUnitTest :app:lintDebug` green; plan checkboxes updated.
+### Phase 6 — Quote-Correctness Fixes (A1–A3, C3) · ✅ COMPLETE (2026-11-19)
+1. [x] **A1:** `effectiveCutoutPerimeterMeters` computed by a global boundary-clipping pass (parent + sibling crossings, strictly-inside drop, shared-edge dedup). Raw perimeter kept for diagnostics. Tests: overlapping windows, protruding window under CLIP_TO_PARENT, flush door, disjoint openings.
+2. [x] **A2:** `doorOpeningWidthMeters` (floor-flush `CutoutKind.DOOR` thresholds only) deducts doorways from flooring baseboard; trim/J-bead/tape consume the effective perimeter. Rules documented in `MASTER_PLAN.md` §3.7. Per-kind trim opt-out deferred to owner decision #3.
+3. [x] **A3:** Silent 30% clamp removed; explicit 0–100% validation with error message; slider widened. Tests for 40% acceptance and 150% rejection.
+4. [x] **C3:** Overrides parsed defensively; unknown preset/out-of-range factor/negative labor degrade to material defaults with per-surface `loadErrors`. Corruption test added.
+- **Exit met:** `:core-domain:test` (31 tests), `:app:testDebugUnitTest` (61 tests), `:app:lintDebug` green.
 
 ### Phase 7 — Manual Entry & Surface Repair (B1, A4)
 1. Manual surface dialog in the quote workspace: width × height (m or ft-in via `UnitConverter`), optional rectangular cutouts with kind, orientation (wall/floor). Synthesize planar `Vec3` vertices and reuse `addSurface` unchanged.

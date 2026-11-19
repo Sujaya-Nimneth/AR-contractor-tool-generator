@@ -1,6 +1,6 @@
 # AR Contractor Quote & Material Estimation App — Master Engineering Plan
 
-> **Architecture Status:** **Phase 5 Complete & Verified** (`:core-domain:test`, `:app:testDebugUnitTest`, `:app:compileDebugKotlin`, `:app:compileDebugAndroidTestKotlin`, `:app:assembleDebug`, `:app:assembleRelease`, and `:app:lintDebug` green) — **Final Hardening Complete**
+> **Architecture Status:** **Phase 6 Complete & Verified** (`:core-domain:test`, `:app:testDebugUnitTest`, `:app:lintDebug` green) — **Quote-Correctness Fixes Complete** (see `IMPROVEMENT_PLAN.md`)
 > **Target Platform:** Native Android (Min SDK 26 / Target SDK 35 / Compile SDK 36, Kotlin 2.2.0, Jetpack Compose Material 3)  
 > **Offline Guarantee:** 100% On-Device Spatial Math, Room Persistence, and Vector `PdfDocument` Generation (Zero Cloud Dependencies)
 
@@ -88,6 +88,8 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
    - **Flooring:** Box rounding, underlayment rolls, and perimeter baseboard/quarter-round linear footage with miter waste.
    - **Painting:** Multi-coat finish paint gallons + optional primer coats + perimeter painter's tape rolls.
    - **Drywall:** Sheet count ($4\times 8$ / $4\times 12$), joint compound buckets, seam tape rolls, screw boxes, and cutout J-bead/corner bead strips.
+   - **Phase 6 union-aware trim perimeter:** Trim/bead/tape quantities are driven by `effectiveCutoutPerimeterMeters` — each cutout boundary edge is split at parent/sibling crossings, segments outside the parent or strictly inside another opening are dropped, and shared collinear edges are deduplicated so overlapping openings never double-bill trim. `cutoutPerimeterMeters` remains the raw diagnostic sum.
+   - **Phase 6 door threshold deduction:** `doorOpeningWidthMeters` sums the horizontal widths of `CutoutKind.DOOR` thresholds flush with the parent's bottom boundary; flooring baseboard runs subtract this width before applying miter waste. Elevated door-shaped cutouts (pass-throughs) do not reduce baseboard.
 8. **Deterministic Financial Arithmetic (`BigDecimal` + `HALF_UP`) & Multi-Surface Aggregation:**
    - All monetary line items (`materialSubtotal`, `consumablesSubtotal`, `laborSubtotal`, `taxAmount`, `grandTotal`) use `BigDecimal` scaled to 2 decimal places (`RoundingMode.HALF_UP`) so itemized line items always sum to the exact penny on client invoices.
    - Includes `ProjectQuoteAggregator` to roll up multi-wall / multi-room scans into a single client quote.
@@ -151,6 +153,14 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
 - [x] Revisioned private PDF filenames, bounded export cleanup, and explicit Android backup/data-extraction exclusions
 - [x] SavedStateHandle restoration of in-progress AR measurements with lifecycle-only persistence and startup-only catalog seeding
 - [x] Release/R8 verify, explicit serialization keep rules, zero lint warnings, and share-sheet string extraction
+
+### Phase 6: Quote-Correctness Fixes *(Complete & Verified)*
+- [x] Union-aware `effectiveCutoutPerimeterMeters` on `SurfaceGeometryMetrics` / `AnalyzedSurfacePolygon` / `AnalyzedCutout` (overlap-safe, protrusion-clipped, shared-edge-deduplicated trim perimeter)
+- [x] `MaterialEstimationEngine` trim, J-bead, and painter's tape consume the effective perimeter; raw perimeter kept for diagnostics
+- [x] `doorOpeningWidthMeters` floor-flush door detection; flooring baseboard run skips door thresholds with explicit calculation basis
+- [x] Full 0–100% project tax range accepted end-to-end; out-of-range values rejected with a user-facing error instead of a silent 30% clamp; slider widened to 0–100%
+- [x] Invalid stored pricing overrides (unknown waste preset, out-of-range factor, negative labor) degrade to material defaults with per-surface `loadErrors` instead of crashing the workspace Flow
+- [x] Regression tests: overlapping/protruding/flush/disjoint cutout perimeters, door vs pass-through widths, door baseboard deduction, union trim billing, high & invalid tax rates, corrupt preset degradation
 
 ---
 
