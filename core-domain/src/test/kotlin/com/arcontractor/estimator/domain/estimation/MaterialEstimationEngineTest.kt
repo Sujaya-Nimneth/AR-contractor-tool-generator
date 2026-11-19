@@ -320,4 +320,91 @@ class MaterialEstimationEngineTest {
             laborLine.lineTotal
         )
     }
+
+    @Test
+    fun `flooring baseboard run skips floor-flush door thresholds`() {
+        // 5m x 4m room (20 m², 18 m perimeter) with a 0.9m wide floor-flush door.
+        val roomFloor = PolygonGeometryEngine.analyze3DSurface(
+            outerVertices3D = listOf(
+                Vec3(0.0, 0.0, 0.0),
+                Vec3(5.0, 0.0, 0.0),
+                Vec3(5.0, 0.0, -4.0),
+                Vec3(0.0, 0.0, -4.0)
+            ),
+            referenceNormal = Vec3.UNIT_Y
+        )
+        val withDoor = BasicSurfaceGeometry(
+            grossAreaSqMeters = roomFloor.grossAreaSqMeters,
+            netAreaSqMeters = roomFloor.netAreaSqMeters,
+            outerPerimeterMeters = roomFloor.outerPerimeterMeters,
+            doorOpeningWidthMeters = 0.9
+        )
+
+        val estimate = MaterialEstimationEngine.estimateSurface(
+            geometry = withDoor,
+            materialSpec = DefaultMaterialCatalog.oakLuxuryVinylPlank
+        )
+        val baseboard = estimate.consumables.single { it.name.contains("Baseboard") }
+        // (18.0 - 0.9) * 1.10 = 18.81 m -> ceil(18.81 / 2.44) = 8 pieces (vs 9 without door).
+        assertEquals(8, baseboard.quantityRequired)
+        assertTrue(baseboard.calculationBasis.contains("doorways"))
+
+        val withoutDoor = MaterialEstimationEngine.estimateSurface(
+            geometry = roomFloor,
+            materialSpec = DefaultMaterialCatalog.oakLuxuryVinylPlank
+        )
+        assertEquals(
+            9,
+            withoutDoor.consumables.single { it.name.contains("Baseboard") }.quantityRequired
+        )
+    }
+
+    @Test
+    fun `overlapping windows bill trim on the union outline instead of summed perimeters`() {
+        // 4m x 2.7m wall with two overlapping 1x1 windows (union outline 5.0 m, raw sum 8.0 m).
+        val wall = PolygonGeometryEngine.analyze3DSurface(
+            outerVertices3D = listOf(
+                Vec3(0.0, 0.0, -2.0),
+                Vec3(4.0, 0.0, -2.0),
+                Vec3(4.0, 2.7, -2.0),
+                Vec3(0.0, 2.7, -2.0)
+            ),
+            cutouts = listOf(
+                CutoutPolygonInput(
+                    id = "w1",
+                    label = "Window A",
+                    kind = CutoutKind.WINDOW,
+                    vertices3D = listOf(
+                        Vec3(1.0, 1.0, -2.0),
+                        Vec3(2.0, 1.0, -2.0),
+                        Vec3(2.0, 2.0, -2.0),
+                        Vec3(1.0, 2.0, -2.0)
+                    )
+                ),
+                CutoutPolygonInput(
+                    id = "w2",
+                    label = "Window B",
+                    kind = CutoutKind.WINDOW,
+                    vertices3D = listOf(
+                        Vec3(1.5, 1.0, -2.0),
+                        Vec3(2.5, 1.0, -2.0),
+                        Vec3(2.5, 2.0, -2.0),
+                        Vec3(1.5, 2.0, -2.0)
+                    )
+                )
+            ),
+            referenceNormal = Vec3.UNIT_Z
+        )
+
+        assertEquals(8.0, wall.cutoutPerimeterMeters, 1e-8)
+        assertEquals(5.0, wall.effectiveCutoutPerimeterMeters, 1e-8)
+
+        val estimate = MaterialEstimationEngine.estimateSurface(
+            geometry = wall,
+            materialSpec = DefaultMaterialCatalog.porcelainTile300x600Straight
+        )
+        val trim = estimate.consumables.single { it.name.contains("Edge Trim") }
+        // ceil(5.0 * 1.10 / 2.50) = ceil(2.2) = 3 strips (raw perimeters would bill 4).
+        assertEquals(3, trim.quantityRequired)
+    }
 }
