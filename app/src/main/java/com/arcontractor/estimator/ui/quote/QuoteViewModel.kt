@@ -91,6 +91,9 @@ class QuoteViewModel(
 
             QuoteAction.CreateProject -> createProject()
             is QuoteAction.DeleteProject -> deleteProject(action.projectId)
+            is QuoteAction.SetDisplayUnits -> _uiState.update {
+                it.copy(displayUnits = action.units)
+            }
             QuoteAction.OpenProjectDetails -> openProjectDetails()
             QuoteAction.CloseProjectDetails -> _uiState.update {
                 it.copy(

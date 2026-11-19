@@ -49,6 +49,7 @@ fun SurfacePricingPanel(
     surface: SurfaceQuoteLine,
     materials: List<MaterialSpec>,
     currencyCode: String = "USD",
+    displayUnits: DisplayUnitSystem = DisplayUnitSystem.METRIC,
     onAction: (QuoteAction) -> Unit,
     onRemeasure: () -> Unit = {},
     modifier: Modifier = Modifier
@@ -317,23 +318,23 @@ fun SurfacePricingPanel(
                 Row(modifier = Modifier.fillMaxWidth()) {
                     MeasurementFact(
                         label = "Gross",
-                        value = formatArea(analysis.grossAreaSqMeters),
+                        value = formatArea(analysis.grossAreaSqMeters, displayUnits),
                         modifier = Modifier.weight(1f)
                     )
                     MeasurementFact(
                         label = "Openings",
-                        value = formatArea(analysis.cutoutAreaSqMeters),
+                        value = formatArea(analysis.cutoutAreaSqMeters, displayUnits),
                         modifier = Modifier.weight(1f)
                     )
                     MeasurementFact(
                         label = "Net",
-                        value = formatArea(analysis.netAreaSqMeters),
+                        value = formatArea(analysis.netAreaSqMeters, displayUnits),
                         modifier = Modifier.weight(1f)
                     )
                 }
                 Text(
                     text = "${surface.cutouts.size} opening${if (surface.cutouts.size == 1) "" else "s"} · " +
-                        "outer perimeter ${String.format(Locale.US, "%.2f m", analysis.outerPerimeterMeters)} · " +
+                        "outer perimeter ${formatLength(analysis.outerPerimeterMeters, displayUnits)} · " +
                         "flatness RMS ${String.format(Locale.US, "%.1f mm", analysis.rmsPlanarErrorMeters * 1_000.0)}",
                     modifier = Modifier.padding(top = 8.dp),
                     style = MaterialTheme.typography.bodySmall,

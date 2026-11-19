@@ -54,6 +54,15 @@ enum class ManualLengthUnit(val label: String) {
     FEET("ft")
 }
 
+/**
+ * Display-only unit system for quote measurements. Storage, geometry, and pricing
+ * remain SI; PDFs always print dual units regardless of this preference.
+ */
+enum class DisplayUnitSystem {
+    METRIC,
+    IMPERIAL
+}
+
 data class QuoteMessage(
     val text: String,
     val isError: Boolean = false
@@ -110,6 +119,7 @@ data class QuoteUiState(
     val projects: List<ProjectEntity> = emptyList(),
     val isProjectSwitcherOpen: Boolean = false,
     val newProjectNameText: String = "",
+    val displayUnits: DisplayUnitSystem = DisplayUnitSystem.METRIC,
     val isExportDialogOpen: Boolean = false,
     val exportDraft: QuoteExportDraft = QuoteExportDraft(),
     val exportedPdf: PdfExportResult? = null,
@@ -144,6 +154,7 @@ sealed interface QuoteAction {
     data class UpdateNewProjectName(val text: String) : QuoteAction
     data object CreateProject : QuoteAction
     data class DeleteProject(val projectId: String) : QuoteAction
+    data class SetDisplayUnits(val units: DisplayUnitSystem) : QuoteAction
     data object OpenProjectDetails : QuoteAction
     data object CloseProjectDetails : QuoteAction
     data class UpdateProjectDetails(val draft: ProjectMetadataDraft) : QuoteAction

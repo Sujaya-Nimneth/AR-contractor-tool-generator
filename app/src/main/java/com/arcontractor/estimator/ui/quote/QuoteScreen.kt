@@ -32,6 +32,7 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -193,7 +194,9 @@ private fun QuoteWorkspace(
             item {
                 QuoteTitleRow(
                     workspace = workspace,
-                    onMeasureSurface = onMeasureSurface
+                    onMeasureSurface = onMeasureSurface,
+                    displayUnits = state.displayUnits,
+                    onSetDisplayUnits = { onAction(QuoteAction.SetDisplayUnits(it)) }
                 )
             }
 
@@ -212,7 +215,8 @@ private fun QuoteWorkspace(
                         workspace = workspace,
                         selectedSurfaceId = state.selectedSurfaceId,
                         onSelectSurface = { onAction(QuoteAction.SelectSurface(it)) },
-                        onMeasureSurface = onMeasureSurface
+                        onMeasureSurface = onMeasureSurface,
+                        displayUnits = state.displayUnits
                     )
                 }
 
@@ -263,6 +267,7 @@ private fun QuoteWorkspace(
                             surface = surface,
                             isSelected = surface.surfaceId == state.selectedSurfaceId,
                             currencyCode = workspace.project.currencyCode,
+                            displayUnits = state.displayUnits,
                             onClick = {
                                 onAction(QuoteAction.SelectSurface(surface.surfaceId))
                             }
@@ -277,6 +282,7 @@ private fun QuoteWorkspace(
                             surface = selectedSurface,
                             materials = workspace.materials,
                             currencyCode = workspace.project.currencyCode,
+                            displayUnits = state.displayUnits,
                             onAction = onAction,
                             onRemeasure = { onRemeasureSurface(selectedSurface.surfaceId) },
                             modifier = Modifier.padding(top = 14.dp)
@@ -288,6 +294,7 @@ private fun QuoteWorkspace(
                     QuoteTotalsCard(
                         quote = workspace.quote,
                         currencyCode = workspace.project.currencyCode,
+                        displayUnits = state.displayUnits,
                         modifier = Modifier.padding(top = 30.dp)
                     )
                 }
@@ -415,7 +422,9 @@ private fun QuoteHeader(
 @Composable
 private fun QuoteTitleRow(
     workspace: ProjectWorkspace?,
-    onMeasureSurface: () -> Unit
+    onMeasureSurface: () -> Unit,
+    displayUnits: DisplayUnitSystem,
+    onSetDisplayUnits: (DisplayUnitSystem) -> Unit
 ) {
     val surfaceCount = workspace?.surfaces?.size ?: 0
     val finding = when {
@@ -443,7 +452,22 @@ private fun QuoteTitleRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
+        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FilterChip(
+                selected = displayUnits == DisplayUnitSystem.METRIC,
+                onClick = { onSetDisplayUnits(DisplayUnitSystem.METRIC) },
+                label = { Text("m²") },
+                shape = RoundedCornerShape(5.dp)
+            )
+            FilterChip(
+                selected = displayUnits == DisplayUnitSystem.IMPERIAL,
+                onClick = { onSetDisplayUnits(DisplayUnitSystem.IMPERIAL) },
+                label = { Text("ft²") },
+                shape = RoundedCornerShape(5.dp)
+            )
+        }
         if (workspace != null && surfaceCount == 0) {
+            Spacer(Modifier.width(10.dp))
             Button(
                 onClick = onMeasureSurface,
                 shape = RoundedCornerShape(6.dp),
@@ -514,7 +538,8 @@ private fun QuoteOverview(
     workspace: ProjectWorkspace,
     selectedSurfaceId: String?,
     onSelectSurface: (String) -> Unit,
-    onMeasureSurface: () -> Unit
+    onMeasureSurface: () -> Unit,
+    displayUnits: DisplayUnitSystem
 ) {
     BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
         if (maxWidth >= 840.dp) {
@@ -526,6 +551,7 @@ private fun QuoteOverview(
                     quote = workspace.quote,
                     surfaceCount = workspace.surfaces.size,
                     currencyCode = workspace.project.currencyCode,
+                    displayUnits = displayUnits,
                     modifier = Modifier.weight(1.08f)
                 )
                 CoverageLedger(
@@ -533,6 +559,7 @@ private fun QuoteOverview(
                     selectedSurfaceId = selectedSurfaceId,
                     onSelectSurface = onSelectSurface,
                     onMeasureSurface = onMeasureSurface,
+                    displayUnits = displayUnits,
                     modifier = Modifier.weight(1f)
                 )
             }
@@ -541,13 +568,15 @@ private fun QuoteOverview(
                 QuoteTotalCard(
                     quote = workspace.quote,
                     surfaceCount = workspace.surfaces.size,
-                    currencyCode = workspace.project.currencyCode
+                    currencyCode = workspace.project.currencyCode,
+                    displayUnits = displayUnits
                 )
                 CoverageLedger(
                     workspace = workspace,
                     selectedSurfaceId = selectedSurfaceId,
                     onSelectSurface = onSelectSurface,
-                    onMeasureSurface = onMeasureSurface
+                    onMeasureSurface = onMeasureSurface,
+                    displayUnits = displayUnits
                 )
             }
         }
@@ -559,6 +588,7 @@ private fun QuoteTotalCard(
     quote: ProjectQuoteSummary,
     surfaceCount: Int,
     currencyCode: String,
+    displayUnits: DisplayUnitSystem,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -589,7 +619,7 @@ private fun QuoteTotalCard(
                 letterSpacing = (-1.2).sp
             )
             Text(
-                text = "${formatArea(quote.totalNetAreaSqMeters)} net · $surfaceCount measured surface" +
+                text = "${formatArea(quote.totalNetAreaSqMeters, displayUnits)} net · $surfaceCount measured surface" +
                     if (surfaceCount == 1) "" else "s",
                 modifier = Modifier.padding(top = 5.dp),
                 style = numericTextStyle,
@@ -625,6 +655,7 @@ private fun CoverageLedger(
     selectedSurfaceId: String?,
     onSelectSurface: (String) -> Unit,
     onMeasureSurface: () -> Unit,
+    displayUnits: DisplayUnitSystem,
     modifier: Modifier = Modifier
 ) {
     val totalArea = workspace.quote.totalNetAreaSqMeters
@@ -653,7 +684,7 @@ private fun CoverageLedger(
                     )
                 }
                 Text(
-                    text = formatArea(totalArea),
+                    text = formatArea(totalArea, displayUnits),
                     style = numericTextStyle.copy(fontWeight = FontWeight.SemiBold),
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -673,6 +704,7 @@ private fun CoverageLedger(
                 workspace.surfaces.take(6).forEach { surface ->
                     CoverageLedgerRow(
                         surface = surface,
+                        displayUnits = displayUnits,
                         fraction = if (totalArea > 0.0) {
                             (surface.analysis?.netAreaSqMeters ?: 0.0) / totalArea
                         } else {
@@ -696,13 +728,13 @@ private fun CoverageLedger(
                 )
                 Row(modifier = Modifier.fillMaxWidth()) {
                     Text(
-                        text = "Gross ${formatArea(workspace.quote.totalGrossAreaSqMeters)}",
+                        text = "Gross ${formatArea(workspace.quote.totalGrossAreaSqMeters, displayUnits)}",
                         modifier = Modifier.weight(1f),
                         style = numericTextStyle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        text = "Openings −${formatArea(workspace.quote.totalCutoutAreaSqMeters)}",
+                        text = "Openings −${formatArea(workspace.quote.totalCutoutAreaSqMeters, displayUnits)}",
                         style = numericTextStyle,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -715,6 +747,7 @@ private fun CoverageLedger(
 @Composable
 private fun CoverageLedgerRow(
     surface: SurfaceQuoteLine,
+    displayUnits: DisplayUnitSystem,
     fraction: Double,
     selected: Boolean,
     onClick: () -> Unit
@@ -744,7 +777,7 @@ private fun CoverageLedgerRow(
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = formatAreaCompact(surface.analysis?.netAreaSqMeters ?: 0.0),
+                text = formatAreaCompact(surface.analysis?.netAreaSqMeters ?: 0.0, displayUnits),
                 style = numericTextStyle,
                 color = MaterialTheme.colorScheme.onSurface
             )
@@ -774,6 +807,7 @@ private fun SurfaceLedgerRow(
     surface: SurfaceQuoteLine,
     isSelected: Boolean,
     currencyCode: String,
+    displayUnits: DisplayUnitSystem,
     onClick: () -> Unit
 ) {
     val estimate = surface.estimate
@@ -827,7 +861,7 @@ private fun SurfaceLedgerRow(
                 )
                 Row(modifier = Modifier.padding(top = 9.dp)) {
                     Text(
-                        text = formatArea(surface.analysis?.netAreaSqMeters ?: 0.0),
+                        text = formatArea(surface.analysis?.netAreaSqMeters ?: 0.0, displayUnits),
                         style = numericTextStyle,
                         color = MaterialTheme.colorScheme.onSurface
                     )
@@ -871,6 +905,7 @@ private fun SurfaceLedgerRow(
 private fun QuoteTotalsCard(
     quote: ProjectQuoteSummary,
     currencyCode: String,
+    displayUnits: DisplayUnitSystem,
     modifier: Modifier = Modifier
 ) {
     Surface(
@@ -898,9 +933,9 @@ private fun QuoteTotalsCard(
                 modifier = Modifier.padding(vertical = 13.dp),
                 color = MaterialTheme.colorScheme.outlineVariant
             )
-            LedgerValueRow("Measured gross area", formatArea(quote.totalGrossAreaSqMeters))
-            LedgerValueRow("Opening deductions", "−${formatArea(quote.totalCutoutAreaSqMeters)}")
-            LedgerValueRow("Net priced area", formatArea(quote.totalNetAreaSqMeters))
+            LedgerValueRow("Measured gross area", formatArea(quote.totalGrossAreaSqMeters, displayUnits))
+            LedgerValueRow("Opening deductions", "−${formatArea(quote.totalCutoutAreaSqMeters, displayUnits)}")
+            LedgerValueRow("Net priced area", formatArea(quote.totalNetAreaSqMeters, displayUnits))
             HorizontalDivider(
                 modifier = Modifier.padding(vertical = 9.dp),
                 color = MaterialTheme.colorScheme.outlineVariant

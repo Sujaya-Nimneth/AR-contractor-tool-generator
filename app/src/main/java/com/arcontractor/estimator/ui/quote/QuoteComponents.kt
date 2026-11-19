@@ -39,11 +39,38 @@ fun formatMoney(value: BigDecimal, currencyCode: String = "USD"): String {
     return formatter.format(value)
 }
 
-fun formatArea(squareMeters: Double): String =
-    String.format(Locale.US, "%.2f m²", squareMeters)
+fun formatArea(
+    squareMeters: Double,
+    units: DisplayUnitSystem = DisplayUnitSystem.METRIC
+): String = when (units) {
+    DisplayUnitSystem.METRIC -> String.format(Locale.US, "%.2f m²", squareMeters)
+    DisplayUnitSystem.IMPERIAL -> String.format(
+        Locale.US,
+        "%.1f ft²",
+        com.arcontractor.estimator.domain.geometry.UnitConverter.sqMetersToSqFeet(squareMeters)
+    )
+}
 
-fun formatAreaCompact(squareMeters: Double): String =
-    String.format(Locale.US, "%.1f m²", squareMeters)
+fun formatAreaCompact(
+    squareMeters: Double,
+    units: DisplayUnitSystem = DisplayUnitSystem.METRIC
+): String = when (units) {
+    DisplayUnitSystem.METRIC -> String.format(Locale.US, "%.1f m²", squareMeters)
+    DisplayUnitSystem.IMPERIAL -> String.format(
+        Locale.US,
+        "%.0f ft²",
+        com.arcontractor.estimator.domain.geometry.UnitConverter.sqMetersToSqFeet(squareMeters)
+    )
+}
+
+fun formatLength(
+    meters: Double,
+    units: DisplayUnitSystem = DisplayUnitSystem.METRIC
+): String = when (units) {
+    DisplayUnitSystem.METRIC -> String.format(Locale.US, "%.2f m", meters)
+    DisplayUnitSystem.IMPERIAL ->
+        com.arcontractor.estimator.domain.geometry.UnitConverter.formatArchitecturalFeetInches(meters)
+}
 
 fun formatPercent(fraction: Double): String =
     String.format(Locale.US, "%.1f%%", fraction * 100.0)
