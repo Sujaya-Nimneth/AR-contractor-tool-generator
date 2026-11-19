@@ -271,12 +271,16 @@ class RoomProjectRepository(
             loadErrors += error
             return emptySurfaceLine(entity, error)
         }
-        val effectiveMaterial = applyOverrides(
+        val overrideErrors = ArrayList<String>()
+        val effectiveMaterial = applyOverridesSafely(
             material = catalogMaterial,
+            surfaceName = entity.name,
             wastePresetOverride = entity.wastePresetOverride,
             customWasteFactorOverride = entity.customWasteFactorOverride,
-            laborRateOverride = entity.laborRateOverride
+            laborRateOverride = entity.laborRateOverride,
+            loadErrors = overrideErrors
         )
+        loadErrors += overrideErrors
 
         val cutouts = stored.cutouts
             .sortedBy(CutoutEntity::displayOrder)
@@ -374,6 +378,44 @@ class RoomProjectRepository(
             customWasteFactor = customWasteFactorOverride ?: material.customWasteFactor,
             laborRatePerUnitArea = laborRateOverride ?: material.laborRatePerUnitArea
         )
+    }
+
+    private fun applyOverridesSafely(
+        material: MaterialSpec,
+        surfaceName: String,
+        wastePresetOverride: String?,
+        customWasteFactorOverride: Double?,
+        laborRateOverride: Double?,
+        loadErrors: MutableList<String>
+    ): MaterialSpec {
+        val wastePreset = wastePresetOverride?.let { name ->
+            runCatching { WastePreset.valueOf(name) }.getOrElse {
+                loadErrors += "Surface '$surfaceName' has unknown waste preset '$name'; " +
+                    "using the material default."
+                material.wastePreset
+            }
+        } ?: material.wastePreset
+        val customFactor = customWasteFactorOverride?.takeIf { it in 0.0..1.0 }
+        if (customWasteFactorOverride != null && customFactor == null) {
+            loadErrors += "Surface '$surfaceName' has an out-of-range waste factor; " +
+                "using the material default."
+        }
+        val laborRate = laborRateOverride?.takeIf { it >= 0.0 }
+        if (laborRateOverride != null && laborRate == null) {
+            loadErrors += "Surface '$surfaceName' has a negative labor rate; " +
+                "using the material default."
+        }
+        return runCatching {
+            material.copy(
+                wastePreset = wastePreset,
+                customWasteFactor = customFactor ?: material.customWasteFactor,
+                laborRatePerUnitArea = laborRate ?: material.laborRatePerUnitArea
+            )
+        }.getOrElse {
+            loadErrors += "Surface '$surfaceName' has invalid pricing overrides; " +
+                "using the material defaults."
+            material
+        }
     }
 
     private fun quoteInput(surface: SurfaceQuoteLine): ProjectSurfaceInput? {
