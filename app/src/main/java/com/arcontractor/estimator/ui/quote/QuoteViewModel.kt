@@ -298,12 +298,16 @@ class QuoteViewModel(
 
     private fun setProjectTaxRate(rate: Double) {
         val projectId = _uiState.value.projectId ?: return
+        if (rate !in 0.0..1.0) {
+            showError("Tax rate must be between 0% and 100%.")
+            return
+        }
         val policy = _uiState.value.taxPolicy
         viewModelScope.launch {
             runCatching {
                 projectRepository.updateProjectTaxSettings(
                     projectId = projectId,
-                    taxRate = rate.coerceIn(0.0, 0.30),
+                    taxRate = rate,
                     taxPolicy = policy
                 )
             }.onFailure { error ->

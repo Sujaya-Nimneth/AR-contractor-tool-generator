@@ -67,12 +67,12 @@ fun ProjectAdjustmentsPanel(
                 onValueChangeFinished = {
                     onAction(QuoteAction.SetProjectTaxRate(sliderValue.toDouble()))
                 },
-                valueRange = 0f..0.25f,
-                steps = 49,
+                valueRange = 0f..1f,
+                steps = 199,
                 modifier = Modifier.padding(top = 10.dp)
             )
             Text(
-                text = "Set to 0% when the project is not taxable.",
+                text = "Supports 0–100%. Set to 0% when the project is not taxable.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
