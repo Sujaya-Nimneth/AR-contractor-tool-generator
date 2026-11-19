@@ -65,6 +65,7 @@ import com.arcontractor.estimator.domain.estimation.TradeType
 fun QuoteScreen(
     viewModel: QuoteViewModel,
     onMeasureSurface: () -> Unit,
+    onRemeasureSurface: (String) -> Unit = {},
     onSharePdf: (PdfExportResult) -> Unit
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -88,7 +89,8 @@ fun QuoteScreen(
             QuoteWorkspace(
                 state = state,
                 onAction = viewModel::onAction,
-                onMeasureSurface = onMeasureSurface
+                onMeasureSurface = onMeasureSurface,
+                onRemeasureSurface = onRemeasureSurface
             )
         }
     }
@@ -156,7 +158,8 @@ private fun QuoteLoading() {
 private fun QuoteWorkspace(
     state: QuoteUiState,
     onAction: (QuoteAction) -> Unit,
-    onMeasureSurface: () -> Unit
+    onMeasureSurface: () -> Unit,
+    onRemeasureSurface: (String) -> Unit
 ) {
     val workspace = state.workspace
     Box(
@@ -266,6 +269,7 @@ private fun QuoteWorkspace(
                             surface = selectedSurface,
                             materials = workspace.materials,
                             onAction = onAction,
+                            onRemeasure = { onRemeasureSurface(selectedSurface.surfaceId) },
                             modifier = Modifier.padding(top = 14.dp)
                         )
                     }

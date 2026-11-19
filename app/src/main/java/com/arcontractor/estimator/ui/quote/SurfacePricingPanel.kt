@@ -49,6 +49,7 @@ fun SurfacePricingPanel(
     surface: SurfaceQuoteLine,
     materials: List<MaterialSpec>,
     onAction: (QuoteAction) -> Unit,
+    onRemeasure: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     var nameText by remember(surface.surfaceId, surface.surfaceName) {
@@ -413,6 +414,9 @@ fun SurfacePricingPanel(
                     }
                 ) {
                     Text(if (surface.loadError != null) "Fix dimensions" else "Re-enter dimensions")
+                }
+                TextButton(onClick = onRemeasure) {
+                    Text("Re-measure in AR")
                 }
                 Spacer(Modifier.weight(1f))
                 Text(

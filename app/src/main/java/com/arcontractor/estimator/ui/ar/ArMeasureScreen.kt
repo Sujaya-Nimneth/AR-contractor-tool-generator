@@ -67,6 +67,7 @@ import kotlinx.coroutines.delay
 @Composable
 fun ArMeasureScreen(
     viewModel: ArMeasureViewModel = viewModel(),
+    replaceSurfaceId: String? = null,
     onSaveMeasurement: (MeasurementCapture) -> Unit = {},
     onBackToQuote: () -> Unit = {}
 ) {
@@ -337,7 +338,8 @@ fun ArMeasureScreen(
                         MeasurementCapture(
                             outerVertices = state.outerVertices,
                             referenceNormal = state.referencePose?.normal,
-                            cutouts = state.cutouts
+                            cutouts = state.cutouts,
+                            replaceSurfaceId = replaceSurfaceId
                         )
                     )
                 }

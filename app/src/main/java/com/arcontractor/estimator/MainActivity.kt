@@ -12,6 +12,8 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import androidx.navigation.NavType
+import androidx.navigation.navArgument
 import com.arcontractor.estimator.ui.ar.ArMeasureScreen
 import com.arcontractor.estimator.R
 import com.arcontractor.estimator.ui.quote.QuoteAction
@@ -59,6 +61,11 @@ private fun EstimatorApp(container: AppContainer) {
                         launchSingleTop = true
                     }
                 },
+                onRemeasureSurface = { surfaceId ->
+                    navController.navigate("$MEASURE_ROUTE?surfaceId=$surfaceId") {
+                        launchSingleTop = true
+                    }
+                },
                 onSharePdf = { result ->
                     val shareIntent = Intent(Intent.ACTION_SEND).apply {
                         type = "application/pdf"
@@ -78,12 +85,22 @@ private fun EstimatorApp(container: AppContainer) {
                 }
             )
         }
-        composable(MEASURE_ROUTE) {
+        composable(
+            route = MEASURE_ROUTE_PATTERN,
+            arguments = listOf(
+                navArgument("surfaceId") {
+                    type = NavType.StringType
+                    nullable = true
+                    defaultValue = null
+                }
+            )
+        ) { entry ->
             ArMeasureScreen(
+                replaceSurfaceId = entry.arguments?.getString("surfaceId"),
                 onSaveMeasurement = { capture ->
                     quoteViewModel.onAction(QuoteAction.SaveMeasurement(capture))
                     navController.navigate(QUOTE_ROUTE) {
-                        popUpTo(MEASURE_ROUTE) { inclusive = true }
+                        popUpTo(MEASURE_ROUTE_PATTERN) { inclusive = true }
                         launchSingleTop = true
                     }
                 },
@@ -97,3 +114,4 @@ private fun EstimatorApp(container: AppContainer) {
 
 private const val QUOTE_ROUTE = "quote"
 private const val MEASURE_ROUTE = "measure"
+private const val MEASURE_ROUTE_PATTERN = "measure?surfaceId={surfaceId}"
