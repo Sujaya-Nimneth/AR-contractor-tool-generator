@@ -27,8 +27,11 @@ import kotlinx.coroutines.flow.combine
 
 interface ProjectRepository {
     fun observeWorkspace(projectId: String): Flow<ProjectWorkspace?>
+    fun observeProjects(): Flow<List<ProjectEntity>>
 
     suspend fun ensureDefaultProject(): String
+    suspend fun createProject(name: String): String
+    suspend fun deleteProject(projectId: String)
     suspend fun addSurface(projectId: String, draft: SurfaceMeasurementDraft): String
     suspend fun replaceSurfaceMeasurement(surfaceId: String, draft: SurfaceMeasurementDraft)
     suspend fun updateSurfaceSettings(
@@ -51,7 +54,8 @@ interface ProjectRepository {
         clientName: String,
         contractorName: String,
         contractorContact: String,
-        contractorLicense: String
+        contractorLicense: String,
+        currencyCode: String
     )
 
     suspend fun renameSurface(surfaceId: String, name: String)
@@ -118,6 +122,35 @@ class RoomProjectRepository(
                 loadErrors = loadErrors
             )
         }
+
+    override fun observeProjects(): Flow<List<ProjectEntity>> = projectDao.observeAll()
+
+    override suspend fun createProject(name: String): String {
+        require(name.isNotBlank()) { "Project name cannot be blank." }
+        val timestamp = now()
+        val project = ProjectEntity(
+            id = idGenerator(),
+            name = name.trim(),
+            clientName = "",
+            contractorName = "",
+            contractorContact = "",
+            contractorLicense = "",
+            taxRate = 0.0,
+            taxPolicy = TaxPolicy.TAX_TOTAL_SUBTOTAL.name,
+            createdAtEpochMillis = timestamp,
+            updatedAtEpochMillis = timestamp
+        )
+        projectDao.upsert(project)
+        return project.id
+    }
+
+    override suspend fun deleteProject(projectId: String) {
+        projectDao.getById(projectId) ?: error("The project no longer exists.")
+        require(projectDao.count() > 1) {
+            "The last project cannot be deleted. Create another project first."
+        }
+        projectDao.delete(projectId)
+    }
 
     override suspend fun ensureDefaultProject(): String {
         val existing = projectDao.getFirst()
@@ -270,12 +303,16 @@ class RoomProjectRepository(
         clientName: String,
         contractorName: String,
         contractorContact: String,
-        contractorLicense: String
+        contractorLicense: String,
+        currencyCode: String
     ) {
         require(name.isNotBlank()) { "Project name cannot be blank." }
         require(contractorName.length <= 120) { "Contractor name is too long." }
         require(contractorContact.length <= 240) { "Contractor contact is too long." }
         require(contractorLicense.length <= 120) { "Contractor license is too long." }
+        require(currencyCode in SUPPORTED_CURRENCIES) {
+            "Unsupported currency '$currencyCode'."
+        }
         projectDao.updateMetadata(
             projectId = projectId,
             name = name.trim(),
@@ -283,6 +320,7 @@ class RoomProjectRepository(
             contractorName = contractorName.trim(),
             contractorContact = contractorContact.trim(),
             contractorLicense = contractorLicense.trim(),
+            currencyCode = currencyCode,
             updatedAtEpochMillis = now()
         )
     }
@@ -473,5 +511,6 @@ class RoomProjectRepository(
     private companion object {
         const val DEFAULT_PROJECT_ID = "default-project"
         const val DEFAULT_PROJECT_NAME = "Untitled contractor quote"
+        val SUPPORTED_CURRENCIES = setOf("USD", "EUR", "GBP", "CAD", "AUD", "NZD", "INR", "LKR", "SGD", "AED", "JPY", "CHF", "ZAR")
     }
 }

@@ -189,7 +189,8 @@ class RepositoryTest {
             clientName = "  Morgan & Lee  ",
             contractorName = "  Northline Build Co.  ",
             contractorContact = "  hello@northline.example | +1 555 0142  ",
-            contractorLicense = "  GC-10482  "
+            contractorLicense = "  GC-10482  ",
+            currencyCode = "EUR"
         )
 
         val workspace = fixtures.projectRepository.observeWorkspace(projectId)
@@ -203,6 +204,7 @@ class RepositoryTest {
             workspace.project.contractorContact
         )
         assertEquals("GC-10482", workspace.project.contractorLicense)
+        assertEquals("EUR", workspace.project.currencyCode)
     }
 
     @Test

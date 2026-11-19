@@ -25,6 +25,8 @@ class FakeProjectDao : ProjectDao {
 
     override suspend fun getFirst(): ProjectEntity? = projects.value.firstOrNull()
 
+    override suspend fun count(): Int = projects.value.size
+
     override suspend fun upsert(project: ProjectEntity) {
         projects.value = projects.value.filterNot { it.id == project.id } + project
     }
@@ -36,6 +38,7 @@ class FakeProjectDao : ProjectDao {
         contractorName: String,
         contractorContact: String,
         contractorLicense: String,
+        currencyCode: String,
         updatedAtEpochMillis: Long
     ) {
         projects.value = projects.value.map { project ->
@@ -46,6 +49,7 @@ class FakeProjectDao : ProjectDao {
                     contractorName = contractorName,
                     contractorContact = contractorContact,
                     contractorLicense = contractorLicense,
+                    currencyCode = currencyCode,
                     updatedAtEpochMillis = updatedAtEpochMillis
                 )
             } else {

@@ -21,6 +21,9 @@ interface ProjectDao {
     @Query("SELECT * FROM projects ORDER BY createdAtEpochMillis ASC LIMIT 1")
     suspend fun getFirst(): ProjectEntity?
 
+    @Query("SELECT COUNT(*) FROM projects")
+    suspend fun count(): Int
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsert(project: ProjectEntity)
 
@@ -32,6 +35,7 @@ interface ProjectDao {
             contractorName = :contractorName,
             contractorContact = :contractorContact,
             contractorLicense = :contractorLicense,
+            currencyCode = :currencyCode,
             updatedAtEpochMillis = :updatedAtEpochMillis
         WHERE id = :projectId
         """
@@ -43,6 +47,7 @@ interface ProjectDao {
         contractorName: String,
         contractorContact: String,
         contractorLicense: String,
+        currencyCode: String,
         updatedAtEpochMillis: Long
     )
 

@@ -79,7 +79,8 @@ data class ProjectMetadataDraft(
     val clientName: String,
     val contractorName: String,
     val contractorContact: String,
-    val contractorLicense: String
+    val contractorLicense: String,
+    val currencyCode: String = "USD"
 )
 
 data class QuoteExportDraft(

@@ -458,7 +458,8 @@ class QuoteViewModel(
                     clientName = project.clientName,
                     contractorName = project.contractorName,
                     contractorContact = project.contractorContact,
-                    contractorLicense = project.contractorLicense
+                    contractorLicense = project.contractorLicense,
+                    currencyCode = project.currencyCode
                 ),
                 message = null
             )
@@ -483,7 +484,8 @@ class QuoteViewModel(
                     clientName = draft.clientName,
                     contractorName = draft.contractorName,
                     contractorContact = draft.contractorContact,
-                    contractorLicense = draft.contractorLicense
+                    contractorLicense = draft.contractorLicense,
+                    currencyCode = draft.currencyCode
                 )
             }.onSuccess {
                 _uiState.update {
