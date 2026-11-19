@@ -189,6 +189,14 @@ class ArMeasureViewModel(
                     )
                     return
                 }
+                if (current.outerVertices.size >= MAX_POLYGON_VERTICES) {
+                    _uiState.value = current.copy(
+                        reticleSample = sample,
+                        message = "A surface supports up to $MAX_POLYGON_VERTICES corners. " +
+                            "Close this polygon and measure the remaining area as a second surface."
+                    )
+                    return
+                }
                 pushUndo(current)
                 val vertices = current.outerVertices + sample.pose.position
                 _uiState.value = current.copy(
@@ -207,6 +215,14 @@ class ArMeasureViewModel(
                     _uiState.value = current.copy(
                         reticleSample = sample,
                         message = "Move the reticle to the next opening corner."
+                    )
+                    return
+                }
+                if (current.activeCutoutVertices.size >= MAX_POLYGON_VERTICES) {
+                    _uiState.value = current.copy(
+                        reticleSample = sample,
+                        message = "An opening supports up to $MAX_POLYGON_VERTICES corners. " +
+                            "Finish this opening and add another if needed."
                     )
                     return
                 }
@@ -523,6 +539,7 @@ class ArMeasureViewModel(
     private companion object {
         const val MAX_HISTORY_DEPTH = 50
         const val MIN_VERTEX_SEPARATION_METERS = 0.005
+        const val MAX_POLYGON_VERTICES = 64
         const val KEY_MEASUREMENT_DRAFT = "ar_measurement_draft"
     }
 }
