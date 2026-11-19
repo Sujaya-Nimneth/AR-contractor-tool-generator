@@ -107,6 +107,12 @@ fun QuoteScreen(
             onAction = viewModel::onAction
         )
     }
+    if (state.isProjectSwitcherOpen) {
+        ProjectSwitcherDialog(
+            state = state,
+            onAction = viewModel::onAction
+        )
+    }
     if (state.isProjectDetailsOpen) {
         ProjectDetailsDialog(
             state = state,
@@ -179,7 +185,8 @@ private fun QuoteWorkspace(
                     projectName = workspace?.project?.name ?: "Untitled contractor quote",
                     onOpenCatalog = { onAction(QuoteAction.OpenCatalog) },
                     onMeasureSurface = onMeasureSurface,
-                    onManualEntry = { onAction(QuoteAction.OpenManualEntry()) }
+                    onManualEntry = { onAction(QuoteAction.OpenManualEntry()) },
+                    onOpenProjects = { onAction(QuoteAction.OpenProjectSwitcher) }
                 )
             }
 
@@ -352,7 +359,8 @@ private fun QuoteHeader(
     projectName: String,
     onOpenCatalog: () -> Unit,
     onMeasureSurface: () -> Unit,
-    onManualEntry: () -> Unit
+    onManualEntry: () -> Unit,
+    onOpenProjects: () -> Unit
 ) {
     Column {
         Row(
@@ -364,6 +372,7 @@ private fun QuoteHeader(
                 modifier = Modifier
                     .weight(1f)
                     .padding(start = 11.dp)
+                    .clickable(onClick = onOpenProjects)
             ) {
                 Text(
                     text = "SITE LEDGER",
@@ -373,7 +382,7 @@ private fun QuoteHeader(
                     letterSpacing = 1.5.sp
                 )
                 Text(
-                    text = projectName,
+                    text = "$projectName ▾",
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     style = MaterialTheme.typography.bodySmall,
                     maxLines = 1,
