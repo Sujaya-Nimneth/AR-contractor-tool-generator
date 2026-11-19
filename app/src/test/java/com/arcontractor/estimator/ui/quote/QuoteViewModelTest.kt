@@ -352,6 +352,47 @@ class QuoteViewModelTest {
         assertTrue(state.workspace?.surfaces.isNullOrEmpty())
     }
 
+    @Test
+    fun `AR capture targeting an existing surface replaces it in place`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.onAction(
+            QuoteAction.SaveMeasurement(
+                MeasurementCapture(
+                    outerVertices = RECTANGLE,
+                    referenceNormal = Vec3(0.0, 0.0, 1.0),
+                    cutouts = emptyList(),
+                    name = "AR original"
+                )
+            )
+        )
+        val original = viewModel.uiState.value.selectedSurface ?: error("Missing surface")
+        viewModel.onAction(QuoteAction.SetSurfaceLaborRate(original.surfaceId, 65.0))
+
+        viewModel.onAction(
+            QuoteAction.SaveMeasurement(
+                MeasurementCapture(
+                    outerVertices = listOf(
+                        Vec3(0.0, 0.0, 0.0),
+                        Vec3(4.0, 0.0, 0.0),
+                        Vec3(4.0, 2.0, 0.0),
+                        Vec3(0.0, 2.0, 0.0)
+                    ),
+                    referenceNormal = Vec3(0.0, 0.0, 1.0),
+                    cutouts = emptyList(),
+                    replaceSurfaceId = original.surfaceId
+                )
+            )
+        )
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.workspace?.surfaces?.size)
+        val replaced = state.selectedSurface ?: error("Missing replaced surface")
+        assertEquals(original.surfaceId, replaced.surfaceId)
+        assertEquals("AR original", replaced.surfaceName)
+        assertEquals(8.0, replaced.analysis?.netAreaSqMeters ?: -1.0, 1e-6)
+        assertEquals(65.0, replaced.effectiveMaterial.laborRatePerUnitArea, 1e-9)
+    }
+
     private fun createViewModel(
         exporter: QuotePdfExporter = RecordingQuotePdfExporter()
     ): QuoteViewModel {
