@@ -310,8 +310,8 @@ class RoomProjectRepository(
         require(contractorName.length <= 120) { "Contractor name is too long." }
         require(contractorContact.length <= 240) { "Contractor contact is too long." }
         require(contractorLicense.length <= 120) { "Contractor license is too long." }
-        require(currencyCode in SUPPORTED_CURRENCIES) {
-            "Unsupported currency '$currencyCode'."
+        require(currencyCode.length == 3 && currencyCode.all { it in 'A'..'Z' }) {
+            "Currency must be a 3-letter ISO 4217 code, e.g. USD or EUR."
         }
         projectDao.updateMetadata(
             projectId = projectId,
@@ -511,6 +511,5 @@ class RoomProjectRepository(
     private companion object {
         const val DEFAULT_PROJECT_ID = "default-project"
         const val DEFAULT_PROJECT_NAME = "Untitled contractor quote"
-        val SUPPORTED_CURRENCIES = setOf("USD", "EUR", "GBP", "CAD", "AUD", "NZD", "INR", "LKR", "SGD", "AED", "JPY", "CHF", "ZAR")
     }
 }

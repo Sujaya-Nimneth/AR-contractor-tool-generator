@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -111,6 +112,58 @@ fun ProjectDetailsDialog(
                     modifier = Modifier.fillMaxWidth(),
                     label = { Text("License / registration") },
                     singleLine = true,
+                    keyboardOptions = KeyboardOptions(imeAction = ImeAction.Next)
+                )
+                Text(
+                    text = "Quote currency",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    COMMON_CURRENCIES.take(4).forEach { code ->
+                        CurrencyChip(
+                            code = code,
+                            selected = draft.currencyCode == code,
+                            onClick = {
+                                onAction(
+                                    QuoteAction.UpdateProjectDetails(draft.copy(currencyCode = code))
+                                )
+                            }
+                        )
+                    }
+                }
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    COMMON_CURRENCIES.drop(4).forEach { code ->
+                        CurrencyChip(
+                            code = code,
+                            selected = draft.currencyCode == code,
+                            onClick = {
+                                onAction(
+                                    QuoteAction.UpdateProjectDetails(draft.copy(currencyCode = code))
+                                )
+                            }
+                        )
+                    }
+                }
+                OutlinedTextField(
+                    value = draft.currencyCode,
+                    onValueChange = {
+                        onAction(
+                            QuoteAction.UpdateProjectDetails(
+                                draft.copy(currencyCode = it.uppercase().take(3))
+                            )
+                        )
+                    },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Currency code (ISO 4217)") },
+                    singleLine = true,
+                    supportingText = { Text("Any 3-letter code, e.g. SEK, MXN, BRL.") },
                     keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done)
                 )
             }
@@ -142,3 +195,19 @@ fun ProjectDetailsDialog(
         }
     )
 }
+
+@Composable
+private fun CurrencyChip(
+    code: String,
+    selected: Boolean,
+    onClick: () -> Unit
+) {
+    androidx.compose.material3.FilterChip(
+        selected = selected,
+        onClick = onClick,
+        label = { Text(code) },
+        shape = RoundedCornerShape(5.dp)
+    )
+}
+
+private val COMMON_CURRENCIES = listOf("USD", "EUR", "GBP", "CAD", "AUD", "INR", "LKR", "AED")
