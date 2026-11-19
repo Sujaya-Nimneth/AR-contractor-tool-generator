@@ -240,6 +240,118 @@ class QuoteViewModelTest {
         assertTrue(state.message?.isError == true)
     }
 
+    @Test
+    fun `manual metric wall with door becomes a priced quote surface`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.onAction(QuoteAction.OpenManualEntry())
+        val draft = viewModel.uiState.value.manualSurfaceDraft ?: error("Missing manual draft")
+        viewModel.onAction(
+            QuoteAction.UpdateManualSurfaceDraft(
+                draft.copy(
+                    name = "Manual north wall",
+                    widthText = "4",
+                    heightText = "2.7",
+                    cutouts = listOf(
+                        ManualCutoutDraft(
+                            kind = com.arcontractor.estimator.domain.geometry.CutoutKind.DOOR,
+                            offsetHorizontalText = "0.4",
+                            offsetVerticalText = "0",
+                            widthText = "0.9",
+                            heightText = "2.1"
+                        )
+                    )
+                )
+            )
+        )
+        viewModel.onAction(QuoteAction.SaveManualSurface)
+
+        val state = viewModel.uiState.value
+        assertFalse(state.isManualEntryOpen)
+        assertFalse(state.isSavingMeasurement)
+        val surface = state.selectedSurface ?: error("Missing saved surface")
+        assertEquals("Manual north wall", surface.surfaceName)
+        assertEquals(8.91, surface.analysis?.netAreaSqMeters ?: -1.0, 1e-6)
+        assertEquals(0.9, surface.analysis?.doorOpeningWidthMeters ?: -1.0, 1e-6)
+        assertTrue((surface.estimate?.grandTotal?.toDouble() ?: 0.0) > 0.0)
+    }
+
+    @Test
+    fun `manual entry in feet converts dimensions through UnitConverter`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.onAction(QuoteAction.OpenManualEntry())
+        val draft = viewModel.uiState.value.manualSurfaceDraft ?: error("Missing manual draft")
+        viewModel.onAction(
+            QuoteAction.UpdateManualSurfaceDraft(
+                draft.copy(
+                    orientation = com.arcontractor.estimator.domain.geometry.ManualSurfaceOrientation.FLOOR,
+                    unit = ManualLengthUnit.FEET,
+                    widthText = "10",
+                    heightText = "12"
+                )
+            )
+        )
+        viewModel.onAction(QuoteAction.SaveManualSurface)
+
+        val surface = viewModel.uiState.value.selectedSurface ?: error("Missing saved surface")
+        // 10 ft x 12 ft = 3.048 m x 3.6576 m = 11.1483648 m²
+        assertEquals(11.1483648, surface.analysis?.netAreaSqMeters ?: -1.0, 1e-6)
+    }
+
+    @Test
+    fun `manual re-entry replaces the existing surface and keeps its pricing`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.onAction(
+            QuoteAction.SaveMeasurement(
+                MeasurementCapture(
+                    outerVertices = RECTANGLE,
+                    referenceNormal = Vec3(0.0, 0.0, 1.0),
+                    cutouts = emptyList(),
+                    name = "Original wall"
+                )
+            )
+        )
+        val original = viewModel.uiState.value.selectedSurface ?: error("Missing surface")
+        viewModel.onAction(QuoteAction.SetSurfaceLaborRate(original.surfaceId, 70.0))
+
+        viewModel.onAction(QuoteAction.OpenManualEntry(original.surfaceId))
+        val draft = viewModel.uiState.value.manualSurfaceDraft ?: error("Missing manual draft")
+        assertEquals(original.surfaceId, draft.replaceSurfaceId)
+        viewModel.onAction(
+            QuoteAction.UpdateManualSurfaceDraft(
+                draft.copy(name = "Corrected wall", widthText = "5", heightText = "2.5")
+            )
+        )
+        viewModel.onAction(QuoteAction.SaveManualSurface)
+
+        val state = viewModel.uiState.value
+        assertEquals(1, state.workspace?.surfaces?.size)
+        val replaced = state.selectedSurface ?: error("Missing replaced surface")
+        assertEquals(original.surfaceId, replaced.surfaceId)
+        assertEquals("Corrected wall", replaced.surfaceName)
+        assertEquals(12.5, replaced.analysis?.netAreaSqMeters ?: -1.0, 1e-6)
+        assertEquals(70.0, replaced.effectiveMaterial.laborRatePerUnitArea, 1e-9)
+        assertFalse(state.isManualEntryOpen)
+    }
+
+    @Test
+    fun `invalid manual dimensions surface an error and keep the dialog open`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.onAction(QuoteAction.OpenManualEntry())
+        val draft = viewModel.uiState.value.manualSurfaceDraft ?: error("Missing manual draft")
+        viewModel.onAction(
+            QuoteAction.UpdateManualSurfaceDraft(draft.copy(widthText = "abc", heightText = "2.4"))
+        )
+        viewModel.onAction(QuoteAction.SaveManualSurface)
+
+        val state = viewModel.uiState.value
+        assertTrue(state.isManualEntryOpen)
+        assertTrue(state.message?.isError == true)
+        assertTrue(state.workspace?.surfaces.isNullOrEmpty())
+    }
+
     private fun createViewModel(
         exporter: QuotePdfExporter = RecordingQuotePdfExporter()
     ): QuoteViewModel {
