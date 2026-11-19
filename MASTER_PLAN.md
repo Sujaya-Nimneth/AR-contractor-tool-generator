@@ -1,6 +1,6 @@
 # AR Contractor Quote & Material Estimation App — Master Engineering Plan
 
-> **Architecture Status:** **Phase 7 Complete & Verified** (`:core-domain:test`, `:app:testDebugUnitTest`, `:app:lintDebug` green) — **Manual Entry & Surface Repair Complete** (see `IMPROVEMENT_PLAN.md`)
+> **Architecture Status:** **Phase 8 Complete & Verified** (`:core-domain:test`, `:app:testDebugUnitTest`, `:app:lintDebug` green) — **Multi-Project & Currency Complete** (see `IMPROVEMENT_PLAN.md`)
 > **Target Platform:** Native Android (Min SDK 26 / Target SDK 35 / Compile SDK 36, Kotlin 2.2.0, Jetpack Compose Material 3)  
 > **Offline Guarantee:** 100% On-Device Spatial Math, Room Persistence, and Vector `PdfDocument` Generation (Zero Cloud Dependencies)
 
@@ -170,6 +170,15 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
 - [x] Surface repair: "Fix dimensions" / "Re-enter dimensions" (manual) and "Re-measure in AR" (nav-arg targeted capture) replace broken or outdated measurements in place
 - [x] `MeasurementCapture.replaceSurfaceId` routes both AR and manual saves through in-place replacement
 - [x] Tests: manual wall/floor analysis parity, imperial conversion, replacement identity/pricing, invalid-input rejection, AR targeted replacement
+
+### Phase 8: Multi-Project & Currency *(Complete & Verified)*
+- [x] Room schema v3: `projects.currencyCode` (default `USD`), `MIGRATION_2_3`, exported schema, Robolectric `MigrationTestHelper` validation
+- [x] Repository: `createProject`, `deleteProject` (last-project guard), `observeProjects`, ISO 4217 currency validation on metadata updates
+- [x] Project switcher dialog from the ledger header: list/create/switch/delete with confirmation; active project persists across bootstrap
+- [x] Currency picker in project details (common chips + free ISO code)
+- [x] All UI money (`formatMoney`/`formatRate`, totals, surface rows, pricing panel, catalog) renders the project currency
+- [x] Every PDF money value (cover hero, breakdown, summary tables, blueprint facts, line items, totals, acceptance) uses `workspace.project.currencyCode`
+- [x] Tests: project lifecycle (create/switch/delete/last-guard), currency propagation, symbol formatting, schema migration
 
 ---
 

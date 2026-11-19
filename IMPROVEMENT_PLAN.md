@@ -67,10 +67,10 @@ The codebase is in genuinely good shape: the pure-JVM boundary holds, geometry m
 3. [x] README and MASTER_PLAN updated to describe the delivered manual path.
 - **Exit met:** manual entry → estimate verified in ViewModel tests (metric + imperial + replacement + validation); `:core-domain:test` (35), `:app:testDebugUnitTest` (67), `:app:lintDebug` green.
 
-### Phase 8 — Multi-Project & Currency (B2, B3)
-1. Project list screen (DAOs already support it): create/switch/rename/delete projects; keep `default-project` bootstrap for first launch.
-2. Per-project currency code + locale-aware formatting in UI and `PdfQuoteFormat` (Room migration v3, exported schema + migration test).
-- **Exit:** migration test, quote-number/filename stability per project, lint green.
+### Phase 8 — Multi-Project & Currency (B2, B3) · ✅ COMPLETE (2026-11-19)
+1. [x] Project switcher dialog (create/switch/delete with confirmation, last-project guard); rename via existing project details editor; `default-project` bootstrap kept.
+2. [x] Per-project `currencyCode` (Room v3 + `MIGRATION_2_3` + Robolectric migration test); all UI and PDF money renders the project currency; ISO 4217 validation.
+- **Exit met:** migration test green, quote numbers/filenames already project-scoped, `:core-domain:test` (35), `:app:testDebugUnitTest` (73), `:app:lintDebug` green.
 
 ### Phase 9 — Polish & Hardening (B4, C1, C2, C4–C8)
 1. CI workflow (GitHub Actions): JDK 21, `:core-domain:test :app:testDebugUnitTest :app:assembleDebug :app:lintDebug`.

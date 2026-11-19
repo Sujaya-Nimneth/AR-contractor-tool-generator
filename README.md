@@ -8,6 +8,7 @@ An offline-first Android app for measuring contractor surfaces in AR, estimating
 - Pure Kotlin spatial geometry for best-fit planes, gravity-aligned 2D projection, cutout clipping, and polygon triangulation.
 - Trade-specific estimates for tiling, flooring, painting, and drywall, including package rounding, waste, consumables, labor, and tax.
 - Room-backed projects, surfaces, cutouts, editable contractor branding, and a seeded material catalog.
+- Multiple projects with a switcher: each keeps its own surfaces, client, tax policy, and ISO 4217 currency; every UI total and PDF figure renders in the project currency.
 - Responsive Jetpack Compose quote workspace with material, waste, labor, and tax controls.
 - Native A4 and US Letter vector PDF exports with contractor branding, hatched blueprints, dimension callouts, itemized pricing, terms, and a signature block.
 - Private, revisioned PDF storage exposed to the Android share sheet through a read-only `FileProvider`.
