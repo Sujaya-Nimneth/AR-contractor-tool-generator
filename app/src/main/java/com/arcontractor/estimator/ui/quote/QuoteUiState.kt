@@ -11,14 +11,47 @@ import com.arcontractor.estimator.domain.estimation.TradeParameters
 import com.arcontractor.estimator.domain.estimation.TradeType
 import com.arcontractor.estimator.domain.estimation.WastePreset
 import com.arcontractor.estimator.domain.geometry.CutoutPolygonInput
+import com.arcontractor.estimator.domain.geometry.CutoutKind
+import com.arcontractor.estimator.domain.geometry.ManualSurfaceOrientation
 import com.arcontractor.estimator.domain.geometry.Vec3
 
 data class MeasurementCapture(
     val outerVertices: List<Vec3>,
     val referenceNormal: Vec3?,
     val cutouts: List<CutoutPolygonInput>,
-    val name: String? = null
+    val name: String? = null,
+    val replaceSurfaceId: String? = null
 )
+
+/**
+ * One rectangular opening row in the manual-entry dialog.
+ */
+data class ManualCutoutDraft(
+    val kind: CutoutKind = CutoutKind.DOOR,
+    val offsetHorizontalText: String = "0",
+    val offsetVerticalText: String = "0",
+    val widthText: String = "",
+    val heightText: String = ""
+)
+
+/**
+ * Typed-dimension surface entry draft. Lengths are entered in [unit] and converted
+ * to meters through `UnitConverter` before reaching the domain builder.
+ */
+data class ManualSurfaceDraft(
+    val name: String = "",
+    val orientation: ManualSurfaceOrientation = ManualSurfaceOrientation.WALL,
+    val unit: ManualLengthUnit = ManualLengthUnit.METERS,
+    val widthText: String = "",
+    val heightText: String = "",
+    val cutouts: List<ManualCutoutDraft> = emptyList(),
+    val replaceSurfaceId: String? = null
+)
+
+enum class ManualLengthUnit(val label: String) {
+    METERS("m"),
+    FEET("ft")
+}
 
 data class QuoteMessage(
     val text: String,
@@ -70,6 +103,8 @@ data class QuoteUiState(
     val catalogEditor: CatalogEditorDraft? = null,
     val isProjectDetailsOpen: Boolean = false,
     val projectDetailsDraft: ProjectMetadataDraft? = null,
+    val isManualEntryOpen: Boolean = false,
+    val manualSurfaceDraft: ManualSurfaceDraft? = null,
     val isExportDialogOpen: Boolean = false,
     val exportDraft: QuoteExportDraft = QuoteExportDraft(),
     val exportedPdf: PdfExportResult? = null,
@@ -85,6 +120,10 @@ data class QuoteUiState(
 sealed interface QuoteAction {
     data object Retry : QuoteAction
     data class SaveMeasurement(val capture: MeasurementCapture) : QuoteAction
+    data class OpenManualEntry(val replaceSurfaceId: String? = null) : QuoteAction
+    data object CloseManualEntry : QuoteAction
+    data class UpdateManualSurfaceDraft(val draft: ManualSurfaceDraft) : QuoteAction
+    data object SaveManualSurface : QuoteAction
     data class SelectSurface(val surfaceId: String) : QuoteAction
     data class SetSurfaceMaterial(val surfaceId: String, val materialId: String) : QuoteAction
     data class SetSurfaceWastePreset(val surfaceId: String, val preset: WastePreset) : QuoteAction

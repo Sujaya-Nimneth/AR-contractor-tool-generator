@@ -19,6 +19,10 @@ import com.arcontractor.estimator.domain.estimation.TaxPolicy
 import com.arcontractor.estimator.domain.estimation.TradeParameters
 import com.arcontractor.estimator.domain.estimation.TradeType
 import com.arcontractor.estimator.domain.estimation.WastePreset
+import com.arcontractor.estimator.domain.geometry.CutoutKind
+import com.arcontractor.estimator.domain.geometry.ManualCutoutSpec
+import com.arcontractor.estimator.domain.geometry.ManualSurfaceBuilder
+import com.arcontractor.estimator.domain.geometry.UnitConverter
 import java.util.UUID
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.catch
@@ -47,6 +51,19 @@ class QuoteViewModel(
         when (action) {
             QuoteAction.Retry -> bootstrap()
             is QuoteAction.SaveMeasurement -> saveMeasurement(action.capture)
+            is QuoteAction.OpenManualEntry -> openManualEntry(action.replaceSurfaceId)
+            QuoteAction.CloseManualEntry -> _uiState.update {
+                if (it.isSavingMeasurement) it else it.copy(
+                    isManualEntryOpen = false,
+                    manualSurfaceDraft = null
+                )
+            }
+
+            is QuoteAction.UpdateManualSurfaceDraft -> _uiState.update {
+                it.copy(manualSurfaceDraft = action.draft)
+            }
+
+            QuoteAction.SaveManualSurface -> saveManualSurface()
             is QuoteAction.SelectSurface -> _uiState.update {
                 it.copy(selectedSurfaceId = action.surfaceId)
             }
@@ -165,28 +182,49 @@ class QuoteViewModel(
                 val workspace = projectRepository.observeWorkspace(projectId)
                     .filterNotNull()
                     .first()
+                val replaceTarget = capture.replaceSurfaceId?.let { id ->
+                    workspace.surfaces.firstOrNull { it.surfaceId == id }
+                        ?: error("The surface to replace no longer exists.")
+                }
                 val selectedMaterialId = workspace.surfaces
                     .firstOrNull { it.surfaceId == _uiState.value.selectedSurfaceId }
                     ?.materialId
                     ?: workspace.materials.firstOrNull()?.id
                     ?: error("Add a catalog material before saving a measurement.")
                 val surfaceName = capture.name?.takeIf(String::isNotBlank)
+                    ?: replaceTarget?.surfaceName
                     ?: "Surface ${workspace.surfaces.size + 1}"
-                val surfaceId = projectRepository.addSurface(
-                    projectId = projectId,
-                    draft = SurfaceMeasurementDraft(
-                        name = surfaceName,
-                        outerVertices = capture.outerVertices,
-                        referenceNormal = capture.referenceNormal,
-                        cutouts = capture.cutouts,
-                        materialId = selectedMaterialId
+                if (replaceTarget != null) {
+                    projectRepository.replaceSurfaceMeasurement(
+                        surfaceId = replaceTarget.surfaceId,
+                        draft = SurfaceMeasurementDraft(
+                            name = surfaceName,
+                            outerVertices = capture.outerVertices,
+                            referenceNormal = capture.referenceNormal,
+                            cutouts = capture.cutouts,
+                            materialId = replaceTarget.materialId
+                        )
                     )
-                )
-                surfaceId to surfaceName
+                    replaceTarget.surfaceId to surfaceName
+                } else {
+                    val surfaceId = projectRepository.addSurface(
+                        projectId = projectId,
+                        draft = SurfaceMeasurementDraft(
+                            name = surfaceName,
+                            outerVertices = capture.outerVertices,
+                            referenceNormal = capture.referenceNormal,
+                            cutouts = capture.cutouts,
+                            materialId = selectedMaterialId
+                        )
+                    )
+                    surfaceId to surfaceName
+                }
             }.onSuccess { (surfaceId, surfaceName) ->
                 _uiState.update {
                     it.copy(
                         isSavingMeasurement = false,
+                        isManualEntryOpen = false,
+                        manualSurfaceDraft = null,
                         selectedSurfaceId = surfaceId,
                         message = QuoteMessage("$surfaceName saved to the quote.")
                     )
@@ -196,6 +234,84 @@ class QuoteViewModel(
                 showError(error.message ?: "The measurement could not be saved.")
             }
         }
+    }
+
+    private fun openManualEntry(replaceSurfaceId: String?) {
+        val target = replaceSurfaceId?.let { id ->
+            _uiState.value.workspace?.surfaces?.firstOrNull { it.surfaceId == id }
+        }
+        _uiState.update {
+            it.copy(
+                isManualEntryOpen = true,
+                manualSurfaceDraft = ManualSurfaceDraft(
+                    name = target?.surfaceName ?: "",
+                    replaceSurfaceId = target?.surfaceId
+                ),
+                message = null
+            )
+        }
+    }
+
+    private fun saveManualSurface() {
+        val draft = _uiState.value.manualSurfaceDraft ?: return
+        val capture = runCatching { draft.toMeasurementCapture() }.getOrElse { error ->
+            showError(error.message ?: "Check the surface dimensions.")
+            return
+        }
+        saveMeasurement(capture)
+    }
+
+    private fun ManualSurfaceDraft.toMeasurementCapture(): MeasurementCapture {
+        val width = widthText.toDoubleOrNull()
+            ?: error("Enter the surface width as a number.")
+        val height = heightText.toDoubleOrNull()
+            ?: error("Enter the surface height as a number.")
+        val widthMeters = unit.toMeters(width)
+        val heightMeters = unit.toMeters(height)
+        val cutoutSpecs = cutouts.mapIndexed { index, cutout ->
+            val cutoutWidth = cutout.widthText.toDoubleOrNull()
+                ?: error("Enter the width of opening ${index + 1}.")
+            val cutoutHeight = cutout.heightText.toDoubleOrNull()
+                ?: error("Enter the height of opening ${index + 1}.")
+            val offsetHorizontal = cutout.offsetHorizontalText.toDoubleOrNull()
+                ?: error("Enter the horizontal offset of opening ${index + 1}.")
+            val offsetVertical = cutout.offsetVerticalText.toDoubleOrNull()
+                ?: error("Enter the vertical offset of opening ${index + 1}.")
+            ManualCutoutSpec(
+                label = cutout.kind.manualLabel(),
+                kind = cutout.kind,
+                offsetHorizontalMeters = unit.toMeters(offsetHorizontal),
+                offsetVerticalMeters = unit.toMeters(offsetVertical),
+                widthMeters = unit.toMeters(cutoutWidth),
+                heightMeters = unit.toMeters(cutoutHeight)
+            )
+        }
+        val geometry = ManualSurfaceBuilder.buildRectangularSurface(
+            widthMeters = widthMeters,
+            heightMeters = heightMeters,
+            orientation = orientation,
+            cutouts = cutoutSpecs
+        )
+        return MeasurementCapture(
+            outerVertices = geometry.outerVertices3D,
+            referenceNormal = geometry.referenceNormal,
+            cutouts = geometry.cutouts,
+            name = name.takeIf(String::isNotBlank),
+            replaceSurfaceId = replaceSurfaceId
+        )
+    }
+
+    private fun ManualLengthUnit.toMeters(value: Double): Double = when (this) {
+        ManualLengthUnit.METERS -> value
+        ManualLengthUnit.FEET -> UnitConverter.feetToMeters(value)
+    }
+
+    private fun CutoutKind.manualLabel(): String = when (this) {
+        CutoutKind.DOOR -> "Door"
+        CutoutKind.WINDOW -> "Window"
+        CutoutKind.VENT -> "Vent"
+        CutoutKind.ISLAND_OR_FIXTURE -> "Fixture"
+        CutoutKind.OTHER -> "Opening"
     }
 
     private fun setSurfaceMaterial(action: QuoteAction.SetSurfaceMaterial) {
