@@ -31,10 +31,7 @@ class ArMeasureViewModel(
     private val savedStateHandle: SavedStateHandle = SavedStateHandle()
 ) : ViewModel() {
     private val coplanarityValidator = CoplanarityValidator(
-        CoplanarityConfig(
-            maxNormalAngleDegrees = 15.0,
-            maxOrthogonalDistanceMeters = 0.06
-        )
+        CoplanarityConfig.MEASUREMENT_STANDARD
     )
 
     private val undoStack = ArrayDeque<MeasurementSnapshot>()

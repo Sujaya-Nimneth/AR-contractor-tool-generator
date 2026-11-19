@@ -29,10 +29,7 @@ class ReticleHitTester(
         )
     ),
     private val coplanarityValidator: CoplanarityValidator = CoplanarityValidator(
-        CoplanarityConfig(
-            maxNormalAngleDegrees = 15.0,
-            maxOrthogonalDistanceMeters = 0.06
-        )
+        CoplanarityConfig.MEASUREMENT_STANDARD
     )
 ) {
     private var lockedReferencePose: Pose3D? = null

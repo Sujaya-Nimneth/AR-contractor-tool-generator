@@ -27,6 +27,18 @@ data class CoplanarityConfig(
     }
 
     val minNormalDotProduct: Double = cos(maxNormalAngleDegrees * PI / 180.0)
+
+    companion object {
+        /**
+         * Shared live-measurement gate used by the AR reticle, the measurement state machine,
+         * and saved-surface reconstruction so a surface accepted during capture can always be
+         * re-analyzed from its persisted anchors.
+         */
+        val MEASUREMENT_STANDARD = CoplanarityConfig(
+            maxNormalAngleDegrees = 15.0,
+            maxOrthogonalDistanceMeters = 0.06
+        )
+    }
 }
 
 enum class CoplanarityRejectionReason {

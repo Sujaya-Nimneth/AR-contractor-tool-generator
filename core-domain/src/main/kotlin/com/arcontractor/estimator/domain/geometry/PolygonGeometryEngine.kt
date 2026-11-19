@@ -195,10 +195,7 @@ object PolygonGeometryEngine {
         cutouts: List<CutoutPolygonInput> = emptyList(),
         referenceNormal: Vec3? = null,
         cutoutPolicy: CutoutValidationPolicy = CutoutValidationPolicy.STRICT_INTERIOR_OR_FLUSH,
-        coplanarityConfig: CoplanarityConfig? = CoplanarityConfig(
-            maxNormalAngleDegrees = 15.0,
-            maxOrthogonalDistanceMeters = 0.10
-        )
+        coplanarityConfig: CoplanarityConfig? = CoplanarityConfig.MEASUREMENT_STANDARD
     ): AnalyzedSurfacePolygon {
         val cleanedOuter3D = removeSequentialDuplicates3D(outerVertices3D)
         if (cleanedOuter3D.size < 3) {
