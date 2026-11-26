@@ -56,6 +56,7 @@ import com.arcontractor.estimator.spatial.tracking.intent
 import com.arcontractor.estimator.spatial.tracking.recoveryAction
 import com.arcontractor.estimator.spatial.tracking.resolveArReadiness
 import com.arcontractor.estimator.spatial.tracking.toArSessionFailure
+import com.arcontractor.estimator.ui.quote.DisplayUnitSystem
 import com.arcontractor.estimator.ui.quote.MeasurementCapture
 import com.google.ar.core.TrackingFailureReason
 import com.google.ar.core.TrackingState
@@ -98,6 +99,7 @@ fun ArMeasureScreen(
     var readinessGuidance by remember {
         mutableStateOf(context.checkArReadiness().guidance())
     }
+    var displayUnits by remember { mutableStateOf(DisplayUnitSystem.METRIC) }
     var depthEnabled by remember { mutableStateOf(true) }
     var isResumed by remember {
         mutableStateOf(
@@ -310,6 +312,8 @@ fun ArMeasureScreen(
         Column(modifier = Modifier.align(Alignment.TopCenter)) {
             MeasurementTopHud(
                 state = state,
+                units = displayUnits,
+                onSetUnits = { displayUnits = it },
                 onBackToQuote = onBackToQuote
             )
             AnimatedVisibility(

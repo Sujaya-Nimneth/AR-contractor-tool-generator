@@ -105,12 +105,15 @@ fun MaterialCatalogDialog(
                     CatalogList(
                         materials = state.workspace?.materials.orEmpty(),
                         currencyCode = state.workspace?.project?.currencyCode ?: "USD",
+                        displayUnits = state.displayUnits,
                         onAction = onAction
                     )
                 } else {
                     CatalogEditor(
                         draft = editor,
                         isSaving = state.isSavingCatalog,
+                        currencyCode = state.workspace?.project?.currencyCode ?: "USD",
+                        displayUnits = state.displayUnits,
                         onAction = onAction
                     )
                 }
@@ -209,6 +212,7 @@ private fun CatalogMessage(
 private fun CatalogList(
     materials: List<MaterialSpec>,
     currencyCode: String,
+    displayUnits: DisplayUnitSystem,
     onAction: (QuoteAction) -> Unit
 ) {
     LazyColumn(
@@ -254,6 +258,7 @@ private fun CatalogList(
                 CatalogMaterialRow(
                     material = material,
                     currencyCode = currencyCode,
+                    displayUnits = displayUnits,
                     onClick = {
                         onAction(QuoteAction.EditCatalogMaterial(material.id))
                     }
@@ -267,6 +272,7 @@ private fun CatalogList(
 private fun CatalogMaterialRow(
     material: MaterialSpec,
     currencyCode: String,
+    displayUnits: DisplayUnitSystem,
     onClick: () -> Unit
 ) {
     Surface(
@@ -313,7 +319,7 @@ private fun CatalogMaterialRow(
                 )
                 CatalogFact(
                     label = "Coverage",
-                    value = formatAreaCompact(material.boxCoverageSqMeters),
+                    value = formatAreaCompact(material.boxCoverageSqMeters, displayUnits),
                     modifier = Modifier.weight(1f)
                 )
                 CatalogFact(
@@ -360,6 +366,8 @@ private fun CatalogFact(
 private fun CatalogEditor(
     draft: CatalogEditorDraft,
     isSaving: Boolean,
+    currencyCode: String,
+    displayUnits: DisplayUnitSystem,
     onAction: (QuoteAction) -> Unit
 ) {
     var packageMenuOpen by remember { mutableStateOf(false) }
@@ -491,7 +499,8 @@ private fun CatalogEditor(
                 onValueChange = {
                     onAction(QuoteAction.UpdateCatalogEditor(draft.copy(coverageText = it)))
                 },
-                label = "Coverage per ${draft.primaryUnitType.singular.lowercase()} (m²)",
+                label = "Coverage per ${draft.primaryUnitType.singular.lowercase()} " +
+                    "(${coverageUnitLabel(displayUnits)})",
                 keyboardType = KeyboardType.Decimal,
                 modifier = Modifier.padding(top = 14.dp)
             )
@@ -503,7 +512,7 @@ private fun CatalogEditor(
                 onValueChange = {
                     onAction(QuoteAction.UpdateCatalogEditor(draft.copy(unitCostText = it)))
                 },
-                label = "Cost per ${draft.primaryUnitType.singular.lowercase()} (USD)",
+                label = "Cost per ${draft.primaryUnitType.singular.lowercase()} ($currencyCode)",
                 keyboardType = KeyboardType.Decimal,
                 modifier = Modifier.padding(top = 12.dp)
             )
@@ -563,7 +572,7 @@ private fun CatalogEditor(
                 onValueChange = {
                     onAction(QuoteAction.UpdateCatalogEditor(draft.copy(laborRateText = it)))
                 },
-                label = "Labor rate per ${draft.pricingAreaUnit.symbol} (USD)",
+                label = "Labor rate per ${draft.pricingAreaUnit.symbol} ($currencyCode)",
                 keyboardType = KeyboardType.Decimal,
                 modifier = Modifier.padding(top = 16.dp)
             )
@@ -758,4 +767,10 @@ private fun TradeParameters.summary(): String = when (this) {
     is TradeParameters.Drywall ->
         "${sheetWidthMeters} × ${sheetHeightMeters} m sheets · " +
             "${jointCompoundBucketCoverageSqMeters} m² per compound bucket"
+}
+
+/** Coverage is always stored in SI; the editor label follows the display preference. */
+private fun coverageUnitLabel(displayUnits: DisplayUnitSystem): String = when (displayUnits) {
+    DisplayUnitSystem.METRIC -> "m²"
+    DisplayUnitSystem.IMPERIAL -> "ft²"
 }
