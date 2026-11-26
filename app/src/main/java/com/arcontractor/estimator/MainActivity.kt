@@ -62,7 +62,9 @@ private fun EstimatorApp(container: AppContainer) {
                     }
                 },
                 onRemeasureSurface = { surfaceId ->
-                    navController.navigate("$MEASURE_ROUTE?surfaceId=$surfaceId") {
+                    navController.navigate(
+                        "$MEASURE_ROUTE?surfaceId=${android.net.Uri.encode(surfaceId)}"
+                    ) {
                         launchSingleTop = true
                     }
                 },
@@ -76,12 +78,20 @@ private fun EstimatorApp(container: AppContainer) {
                         )
                         addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                     }
-                    context.startActivity(
-                        Intent.createChooser(
-                            shareIntent,
-                            context.getString(R.string.share_contractor_quote)
+                    runCatching {
+                        context.startActivity(
+                            Intent.createChooser(
+                                shareIntent,
+                                context.getString(R.string.share_contractor_quote)
+                            )
                         )
-                    )
+                    }.onFailure {
+                        android.widget.Toast.makeText(
+                            context,
+                            context.getString(R.string.no_app_to_share_pdf),
+                            android.widget.Toast.LENGTH_LONG
+                        ).show()
+                    }
                 }
             )
         }

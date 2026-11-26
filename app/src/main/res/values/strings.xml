@@ -3,4 +3,5 @@
     <string name="app_name">AR Contractor Estimator</string>
     <string name="share_contractor_quote">Share contractor quote</string>
     <string name="share_quote_pdf">Contractor quote PDF</string>
+    <string name="no_app_to_share_pdf">No app is available to share the quote PDF. The file is saved on this device.</string>
 </resources>

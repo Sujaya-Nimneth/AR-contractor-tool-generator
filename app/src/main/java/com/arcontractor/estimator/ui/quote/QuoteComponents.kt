@@ -24,12 +24,15 @@ import java.math.BigDecimal
 import java.text.NumberFormat
 import java.util.Locale
 import java.util.Currency
-import java.util.concurrent.ConcurrentHashMap
 
-private val currencyFormatters = ConcurrentHashMap<String, NumberFormat>()
+// NumberFormat is not thread-safe, so each thread gets its own per-currency cache.
+private val currencyFormatters = ThreadLocal.withInitial {
+    mutableMapOf<String, NumberFormat>()
+}
 
 fun formatMoney(value: BigDecimal, currencyCode: String = "USD"): String {
-    val formatter = currencyFormatters.getOrPut(currencyCode) {
+    val cache = currencyFormatters.get() ?: mutableMapOf()
+    val formatter = cache.getOrPut(currencyCode) {
         NumberFormat.getCurrencyInstance(Locale.US).apply {
             runCatching { currency = Currency.getInstance(currencyCode) }
             maximumFractionDigits = 2
