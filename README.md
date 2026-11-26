@@ -48,17 +48,22 @@ export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 
 Every push to `main` runs the verification gate, builds a signed release APK with a strictly higher `versionCode`, and refreshes the rolling **[latest release](https://github.com/Sujaya-Nimneth/AR-contractor-tool-generator/releases/latest)**.
 
-| Channel | Release | APK |
+| Channel | Release | APKs |
 | --- | --- | --- |
-| Rolling build of `main` | [`latest`](https://github.com/Sujaya-Nimneth/AR-contractor-tool-generator/releases/latest) | `ar-contractor-estimator-latest.apk` |
-| Pinned SemVer tag | [`v1.0.0`](https://github.com/Sujaya-Nimneth/AR-contractor-tool-generator/releases/tag/v1.0.0) | `ar-contractor-estimator-v1.0.0.apk` |
+| Rolling build of `main` | [`latest`](https://github.com/Sujaya-Nimneth/AR-contractor-tool-generator/releases/tag/latest) | `ar-contractor-estimator-arm64-v8a-latest.apk` (~11 MB, most phones) · `ar-contractor-estimator-universal-latest.apk` (~33 MB) |
+| Pinned SemVer tag | [`v1.0.0`](https://github.com/Sujaya-Nimneth/AR-contractor-tool-generator/releases/tag/v1.0.0) | `ar-contractor-estimator-arm64-v8a-v1.0.0.apk` · `ar-contractor-estimator-universal-v1.0.0.apk` |
+
+Installed builds can also check for updates themselves: the quote workspace footer has a
+**Check for updates** action, and a dismissible banner appears when a newer release is published.
+The updater reads only the public `version.json`, verifies the APK's SHA-256 before installing,
+and never sends project data anywhere.
 
 Each release also ships `SHA256SUMS.txt` and `version.json` (version code, git SHA, build time, APK SHA-256, download URL).
 
 Verify a downloaded APK before installing:
 
 ```bash
-shasum -a 256 ar-contractor-estimator-latest.apk
+shasum -a 256 ar-contractor-estimator-universal-latest.apk
 # compare against SHA256SUMS.txt from the same release
 ```
 

@@ -261,10 +261,12 @@ jobs:
           if gh release view "${GITHUB_REF_NAME}" >/dev/null 2>&1; then
             gh release upload "${GITHUB_REF_NAME}" release-assets/* --clobber
           else
+            # --latest=false keeps releases/latest pointing at the rolling `latest` release,
+            # which is what the in-app updater and the README download links resolve against.
             gh release create "${GITHUB_REF_NAME}" release-assets/* \
               --title "AR Contractor Estimator ${GITHUB_REF_NAME}" \
               --generate-notes \
-              --latest
+              --latest=false
           fi
 
       - name: Clean up signing material
