@@ -3,4 +3,7 @@
     <files-path
         name="quote_exports"
         path="quote-exports/" />
+    <cache-path
+        name="apk_updates"
+        path="apk-updates/" />
 </paths>
