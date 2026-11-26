@@ -57,6 +57,7 @@ fun ProjectDetailsDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(11.dp)
             ) {
+                DialogErrorBanner(message = state.message)
                 OutlinedTextField(
                     value = draft.name,
                     onValueChange = {

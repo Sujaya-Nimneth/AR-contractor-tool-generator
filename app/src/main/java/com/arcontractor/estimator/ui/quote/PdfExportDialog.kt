@@ -59,6 +59,7 @@ fun PdfExportDialog(
         },
         text = {
             Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                DialogErrorBanner(message = state.message)
                 Column {
                     Text(
                         text = "PAPER SIZE",

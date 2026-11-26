@@ -57,6 +57,7 @@ fun ProjectSwitcherDialog(
                 modifier = Modifier.fillMaxWidth(),
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
+                DialogErrorBanner(message = state.message)
                 LazyColumn(
                     modifier = Modifier
                         .fillMaxWidth()
