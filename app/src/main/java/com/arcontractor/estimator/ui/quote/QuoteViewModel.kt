@@ -148,9 +148,9 @@ class QuoteViewModel(
         }
     }
 
-    private fun bootstrap() {
+    private fun bootstrap(successMessage: QuoteMessage? = null) {
         observationJob?.cancel()
-        _uiState.update { it.copy(isLoading = true, message = null) }
+        _uiState.update { it.copy(isLoading = true, message = successMessage) }
         observationJob = viewModelScope.launch {
             runCatching {
                 materialCatalogRepository.ensureSeeded()
@@ -178,9 +178,14 @@ class QuoteViewModel(
         }
     }
 
-    private fun switchProject(projectId: String) {
+    private fun switchProject(projectId: String, successMessage: QuoteMessage? = null) {
         if (projectId == _uiState.value.projectId) {
-            _uiState.update { it.copy(isProjectSwitcherOpen = false) }
+            _uiState.update {
+                it.copy(
+                    isProjectSwitcherOpen = false,
+                    message = successMessage ?: it.message
+                )
+            }
             return
         }
         _uiState.update {
@@ -191,7 +196,7 @@ class QuoteViewModel(
                 workspace = null
             )
         }
-        bootstrap()
+        bootstrap(successMessage)
     }
 
     private fun createProject() {
@@ -203,13 +208,11 @@ class QuoteViewModel(
         viewModelScope.launch {
             runCatching { projectRepository.createProject(name) }
                 .onSuccess { projectId ->
-                    _uiState.update {
-                        it.copy(
-                            newProjectNameText = "",
-                            message = QuoteMessage("$name created.")
-                        )
-                    }
-                    switchProject(projectId)
+                    _uiState.update { it.copy(newProjectNameText = "") }
+                    switchProject(
+                        projectId = projectId,
+                        successMessage = QuoteMessage("$name created.")
+                    )
                 }
                 .onFailure { error ->
                     showError(error.message ?: "The project could not be created.")
@@ -219,20 +222,29 @@ class QuoteViewModel(
 
     private fun deleteProject(projectId: String) {
         viewModelScope.launch {
+            val isActive = _uiState.value.projectId == projectId
+            val fallback = if (isActive) {
+                _uiState.value.projects.firstOrNull { it.id != projectId }?.id
+            } else {
+                null
+            }
+            if (isActive && fallback == null) {
+                showError("The last project cannot be deleted. Create another project first.")
+                return@launch
+            }
+            // Move the workspace observer off the doomed project before deleting it, otherwise
+            // the still-active flow emits a transient null and flashes "project not found".
+            if (fallback != null) {
+                switchProject(fallback)
+            }
             runCatching { projectRepository.deleteProject(projectId) }
                 .onSuccess {
-                    if (_uiState.value.projectId == projectId) {
-                        val fallback = _uiState.value.projects
-                            .firstOrNull { it.id != projectId }?.id
-                        if (fallback != null) {
-                            switchProject(fallback)
-                        }
-                    }
-                    _uiState.update {
-                        it.copy(message = QuoteMessage("Project deleted."))
-                    }
+                    showMessage("Project deleted.")
                 }
                 .onFailure { error ->
+                    if (fallback != null) {
+                        switchProject(projectId)
+                    }
                     showError(error.message ?: "The project could not be deleted.")
                 }
         }
@@ -262,7 +274,8 @@ class QuoteViewModel(
         _uiState.update { it.copy(isSavingMeasurement = true, message = null) }
         viewModelScope.launch {
             runCatching {
-                val projectId = projectRepository.ensureDefaultProject()
+                val projectId = _uiState.value.projectId
+                    ?: projectRepository.ensureDefaultProject()
                 val workspace = projectRepository.observeWorkspace(projectId)
                     .filterNotNull()
                     .first()
