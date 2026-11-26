@@ -92,20 +92,18 @@ class ReticleHitTester(
         )
     }
 
-    private fun validateAgainstLock(candidatePose: Pose3D): CoplanarityResult? {
-        val lockedNormal = lockedSurfaceNormal
+    internal fun validateAgainstLock(candidatePose: Pose3D): CoplanarityResult? {
         lockedBasis?.let { basis ->
             return coplanarityValidator.validateAgainstBasis(
                 basis = basis,
                 candidatePosition = candidatePose.position,
-                candidateNormal = lockedNormal ?: candidatePose.normal
+                // Always compare the *hit* normal so a plane hit that drifted onto an adjacent
+                // surface is genuinely rejected; only depth hits adopt the locked normal upstream.
+                candidateNormal = candidatePose.normal
             )
         }
         val reference = lockedReferencePose ?: return null
-        return coplanarityValidator.validatePose(
-            reference,
-            candidatePose.copy(normal = lockedNormal ?: candidatePose.normal)
-        )
+        return coplanarityValidator.validatePose(reference, candidatePose)
     }
 
     private fun SurfaceHitCandidate.withLockedNormal(lockedNormal: Vec3?): Pose3D =
