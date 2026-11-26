@@ -31,6 +31,35 @@ jobs:
       - name: Domain tests, app unit tests, lint, and debug APK
         run: ./gradlew :core-domain:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --console=plain
 
+      - name: Release R8 and resource shrinking check
+        run: ./gradlew :app:assembleRelease --console=plain
+
+      - name: Assert persisted names survived R8
+        run: |
+          set -euo pipefail
+          MAPPING="app/build/outputs/mapping/release/mapping.txt"
+          for entry in \
+            "com.arcontractor.estimator.ui.ar.ArMeasurePhase" \
+            "com.arcontractor.estimator.domain.geometry.CutoutKind" \
+            "com.arcontractor.estimator.domain.estimation.WastePreset" \
+            "com.arcontractor.estimator.domain.estimation.TaxPolicy"; do
+            if ! grep -q "^$entry -> $entry:" "$MAPPING"; then
+              echo "::error::$entry was obfuscated; saved quotes would not deserialize."
+              exit 1
+            fi
+          done
+
+          # Enum constants are persisted by name, so they must survive in the shipped DEX.
+          APK="$(ls app/build/outputs/apk/release/*.apk | head -n 1)"
+          DEX_DUMP="$RUNNER_TEMP/app.dex.bin"
+          unzip -p "$APK" 'classes*.dex' > "$DEX_DUMP"
+          for constant in DOOR WINDOW CUSTOM STRAIGHT_LAY TAX_TOTAL_SUBTOTAL LOCKING_PLANE; do
+            if ! grep -qa "$constant" "$DEX_DUMP"; then
+              echo "::error::Enum constant '$constant' was renamed by R8."
+              exit 1
+            fi
+          done
+
       - name: Upload test reports on failure
         if: failure()
         uses: actions/upload-artifact@v4

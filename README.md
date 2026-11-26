@@ -44,6 +44,26 @@ The system JDK may be newer than the Android Gradle Plugin toolchain supports. U
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
 ```
 
+## Download & Install
+
+Every push to `main` runs the verification gate, builds a signed release APK with a strictly higher `versionCode`, and refreshes the rolling **[latest release](https://github.com/Sujaya-Nimneth/AR-contractor-tool-generator/releases/latest)**.
+
+| Channel | Release | APK |
+| --- | --- | --- |
+| Rolling build of `main` | [`latest`](https://github.com/Sujaya-Nimneth/AR-contractor-tool-generator/releases/latest) | `ar-contractor-estimator-latest.apk` |
+| Pinned SemVer tag | [`v1.0.0`](https://github.com/Sujaya-Nimneth/AR-contractor-tool-generator/releases/tag/v1.0.0) | `ar-contractor-estimator-v1.0.0.apk` |
+
+Each release also ships `SHA256SUMS.txt` and `version.json` (version code, git SHA, build time, APK SHA-256, download URL).
+
+Verify a downloaded APK before installing:
+
+```bash
+shasum -a 256 ar-contractor-estimator-latest.apk
+# compare against SHA256SUMS.txt from the same release
+```
+
+Because every release is signed with the same keystore and uses a monotonically increasing `versionCode`, a newer APK installs over an older one **without uninstalling** — your saved projects, surfaces, and material catalog are preserved.
+
 ## Build And Test
 
 GitHub Actions runs the domain tests, app unit tests, lint, and debug assembly on every push and pull request (JDK 21).
@@ -58,8 +78,12 @@ GitHub Actions runs the domain tests, app unit tests, lint, and debug assembly o
 # Assemble and lint the debug app
 ./gradlew :app:assembleDebug :app:lintDebug
 
-# Verify the minified release build and R8 keep rules
+# Verify the minified, resource-shrunk release build and R8 keep rules
 ./gradlew :app:assembleRelease
+
+# Build a release with explicit version metadata (as CI does)
+./gradlew :app:assembleRelease \
+  -PappVersionCode=142 -PappVersionName=1.0.42 -PappGitSha=$(git rev-parse --short HEAD)
 ```
 
 The debug APK is written to `app/build/outputs/apk/debug/app-debug.apk`.
@@ -76,6 +100,34 @@ The instrumentation suite generates real A4 and Letter PDFs with Android's `PdfD
 
 The native Canvas unit test renders every A4 and Letter page into `app/build/pdf-preview/` for visual inspection. These PNG previews are build artifacts and are not committed.
 
+## Release Signing (Maintainers)
+
+The release build signs automatically when the four signing values are present as Gradle
+properties or environment variables; otherwise `assembleRelease` produces an unsigned APK so
+local verification still works.
+
+```bash
+keytool -genkeypair -v -keystore release.jks -alias ar-contractor \
+  -keyalg RSA -keysize 4096 -validity 9125 -storetype PKCS12
+
+base64 < release.jks | tr -d '\n' > release.jks.base64
+
+gh secret set ANDROID_KEYSTORE_BASE64 --body "$(cat release.jks.base64)"
+gh secret set ANDROID_KEYSTORE_PASSWORD
+gh secret set ANDROID_KEY_ALIAS
+gh secret set ANDROID_KEY_PASSWORD
+```
+
+`*.jks`, `*.keystore`, and `keystore.properties` are git-ignored. Back the keystore up somewhere
+safe: losing it means future APKs can no longer upgrade installed copies in place.
+
+Cut a permanent release by pushing a SemVer tag:
+
+```bash
+git tag v1.0.0 && git push origin v1.0.0
+```
+
 ## License
 
-This repository does not yet include a license file. Add one before distributing the application or source publicly.
+Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) for
+third-party component attribution.
