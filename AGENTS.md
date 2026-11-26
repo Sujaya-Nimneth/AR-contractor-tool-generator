@@ -7,7 +7,11 @@ Read [`MASTER_PLAN.md`](./MASTER_PLAN.md) **first** before planning or writing a
 - **Phase 2 (Complete & Verified):** ARCore + SceneView camera session control, center-reticle hit testing, EMA/coplanarity filtering, hole-punched Filament surface meshes, and the Compose AR measurement state machine.
 - **Phase 3 (Complete & Verified):** Room persistence, seeded material catalog, repository/quote aggregation, AR-to-quote handoff, and the responsive quote workspace.
 - **Phase 4 (Complete & Verified):** Native A4/Letter vector blueprint and multi-page PDF quote generation, contractor branding, private-file export, and Android share-sheet integration.
-- **Next Active Phase:** None. The project is ready for final review.
+- **Phases 5–10 (Complete & Verified):** Quote-correctness, manual entry, multi-project/currency, polish, critical bug fixes, AR permission/session lifecycle, and R8 keep rules.
+- **Phase 11 (Complete & Verified):** Responsive phone layouts, in-dialog validation banners, currency/unit consistency, exact decimal rate entry, PDF typography fit, launcher-icon safe zone.
+- **Phase 12 (Complete & Verified):** Signed + dynamically versioned release APKs, resource shrinking, Apache-2.0 license, and an auto-updating GitHub Release workflow.
+- **Phase 13 (Complete & Verified):** In-app GitHub release update checker with checksum-verified downloads.
+- **Next Active Phase:** None. The project is feature complete and shipping signed APKs via `releases/latest`.
 
 ## Strict Engineering Rules
 1. **No Stubs:** Never write `// TODO` or placeholder math/UI logic. Deliver complete, production-compilable code.
@@ -19,5 +23,10 @@ Always export Android Studio's bundled JDK 21 (`JBR`) before invoking `./gradlew
 
 ```bash
 export JAVA_HOME="/Applications/Android Studio.app/Contents/jbr/Contents/Home"
-./gradlew :core-domain:test :app:compileDebugKotlin
+export ANDROID_HOME="$HOME/Library/Android/sdk"   # or write sdk.dir into local.properties
+./gradlew :core-domain:test :app:testDebugUnitTest :app:lintDebug :app:assembleRelease
 ```
+
+Release builds sign automatically only when `RELEASE_STORE_FILE`, `RELEASE_STORE_PASSWORD`,
+`RELEASE_KEY_ALIAS` and `RELEASE_KEY_PASSWORD` are set; otherwise the APK stays unsigned, which is
+fine for local verification. CI supplies the signed path through repository secrets.

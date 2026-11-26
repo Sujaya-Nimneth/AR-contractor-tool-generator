@@ -1,6 +1,6 @@
 # AR Contractor Quote & Material Estimation App — Master Engineering Plan
 
-> **Architecture Status:** **Phase 10 Complete & Verified** (`:core-domain:test` 40/40, `:app:testDebugUnitTest` 91/91, `:app:lintDebug`, `:app:assembleDebug`, `:app:assembleRelease`, `:app:compileDebugAndroidTestKotlin` green) — **Critical correctness, AR lifecycle & R8 fixes landed**
+> **Architecture Status:** **Phases 10–13 Complete & Verified** (`:core-domain:test` 40/40, `:app:testDebugUnitTest` 109/109, `:app:lintDebug` 0 issues, `:app:assembleDebug`, `:app:assembleRelease`, `:app:compileDebugAndroidTestKotlin` green) — **App finalized and shipping signed APKs through an auto-updating GitHub Release**
 > **Target Platform:** Native Android (Min SDK 26 / Target SDK 35 / Compile SDK 36, Kotlin 2.2.0, Jetpack Compose Material 3)  
 > **Offline Guarantee:** 100% On-Device Spatial Math, Room Persistence, and Vector `PdfDocument` Generation (Zero Cloud Dependencies)
 
@@ -202,6 +202,36 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
 - [x] `ReticleHitTester.validateAgainstLock()` compares the real hit normal (plane hits can no longer self-validate)
 - [x] R8 keep rules for every name-persisted enum and serialization DTO; verified in `mapping.txt` (`CutoutKind.DOOR` unrenamed)
 - [x] Regression tests: `:core-domain:test` 40/40, `:app:testDebugUnitTest` 91/91 (12 new), `:app:lintDebug` clean, `:app:assembleRelease` green
+
+---
+
+### Phase 11: Mobile UI Polish, Dialog Feedback & App Finalization *(Complete & Verified)*
+- [x] `QuoteHeader` adaptive below 520 dp (project row + wrapping action `FlowRow`); `QuoteTitleRow`, `EmptyLedgerPanel` and `SurfacePricingPanel` action rows use `FlowRow` — zero horizontal overflow at 360 dp
+- [x] `DialogErrorBanner` renders validation errors inside `ManualSurfaceDialog`, `ProjectDetailsDialog`, `ProjectSwitcherDialog`, `PdfExportDialog` instead of behind the scrim
+- [x] Manual cutout chips scroll horizontally; "Re-enter dimensions" prefills the saved bounding width/height + orientation
+- [x] Catalog editor uses the project `currencyCode` and honours `displayUnits`; labor and tax rates accept exact decimals (LKR/INR/JPY and 8.25% tax)
+- [x] AR HUD prints `m²` and exposes a metric/imperial toggle (geometry stays SI)
+- [x] PDF cover hero total auto-scales 30pt → 16pt so long totals never collide with the facts column
+- [x] Launcher icon (colour + monochrome) refitted inside the 66×66 dp safe zone (all miters and the accent dot within radius 30 of `(54,54)`)
+- [x] Verification: `:app:testDebugUnitTest` 98/98, `:app:lintDebug` 0 issues, `:app:assembleRelease` green
+
+### Phase 12: Release Signing, Dynamic Versioning & Auto-Updating GitHub Releases *(Complete & Verified)*
+- [x] `signingConfigs.release` gated on all four signing values; local unsigned `assembleRelease` still works
+- [x] `versionCode`/`versionName` from `-P` flags; `BuildConfig.GIT_SHA` + `GITHUB_REPO`; `isShrinkResources = true`
+- [x] Room schema JSON moved to `debug`/`androidTest` assets — confirmed absent from the release APK
+- [x] `-PsplitApks` → `arm64-v8a` (10.7 MB), `armeabi-v7a` (9.1 MB), `universal` (33.3 MB)
+- [x] `release-apk.yml`: verification gate → monotonic `versionCode` → keystore decode → signed build → `apksigner verify` per APK → `SHA256SUMS.txt` + `version.json` → rolling `latest` / immutable `vX.Y.Z` release; `mapping.txt` artifact; always-run keystore cleanup
+- [x] `android-ci.yml` builds the release variant and asserts enum class names in `mapping.txt` plus enum constants in the shipped DEX
+- [x] Apache-2.0 `LICENSE` + `NOTICE`; README download/verify, signing setup, and tag-release instructions
+- [x] Live verification: `latest` release published with versionCode 208 / 1.0.108, APK SHA-256 matches `SHA256SUMS.txt`, `apksigner` cert SHA-256 matches the release keystore
+
+### Phase 13: In-App GitHub Release Update Checker *(Complete & Verified)*
+- [x] `INTERNET` + `REQUEST_INSTALL_PACKAGES`; `apk-updates/` cache path registered with `FileProvider`
+- [x] `GitHubUpdateChecker`: single GET on `version.json` (8 s timeouts, `HttpURLConnection`), SHA-256 verified download that deletes mismatched files, ABI-aware `bestVariant()`
+- [x] `UpdateCoordinator` (Android gateway) + `UpdateGateway` interface so the ViewModel stays context-free
+- [x] Dismissible update banner with Download, plus "Check for updates" beside the version footer; offline/corrupt/failed checks never block the workspace
+- [x] Tests: newer/equal/older versionCode, corrupt JSON, offline, checksum mismatch/match, variant preference, banner/dismiss/latest/failure flows
+- [x] Verification: `:app:testDebugUnitTest` 109/109, `:app:lintDebug` 0 issues, `:app:assembleRelease` green
 
 ---
 
