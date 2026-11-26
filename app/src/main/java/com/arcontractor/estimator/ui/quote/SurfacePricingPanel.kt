@@ -5,6 +5,8 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -44,15 +46,16 @@ import com.arcontractor.estimator.domain.estimation.MaterialSpec
 import com.arcontractor.estimator.domain.estimation.WastePreset
 import java.util.Locale
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SurfacePricingPanel(
     surface: SurfaceQuoteLine,
     materials: List<MaterialSpec>,
+    onAction: (QuoteAction) -> Unit,
+    modifier: Modifier = Modifier,
     currencyCode: String = "USD",
     displayUnits: DisplayUnitSystem = DisplayUnitSystem.METRIC,
-    onAction: (QuoteAction) -> Unit,
-    onRemeasure: () -> Unit = {},
-    modifier: Modifier = Modifier
+    onRemeasure: () -> Unit = {}
 ) {
     var nameText by remember(surface.surfaceId, surface.surfaceName) {
         mutableStateOf(surface.surfaceName)
@@ -68,6 +71,9 @@ fun SurfacePricingPanel(
     val laborRate = surface.effectiveMaterial.laborRatePerUnitArea
     var laborSliderValue by remember(surface.surfaceId, laborRate) {
         mutableFloatStateOf(laborRate.toFloat())
+    }
+    var laborRateText by remember(surface.surfaceId, laborRate) {
+        mutableStateOf(trimTrailingZeros(laborRate))
     }
 
     Surface(
@@ -306,8 +312,48 @@ fun SurfacePricingPanel(
                         )
                     )
                 },
-                valueRange = 0f..200f,
-                steps = 39
+                valueRange = 0f..laborSliderCeiling(laborSliderValue),
+                modifier = Modifier.padding(top = 4.dp)
+            )
+            OutlinedTextField(
+                value = laborRateText,
+                onValueChange = { raw ->
+                    val filtered = raw.filter { it.isDigit() || it == '.' || it == ',' }
+                        .replace(',', '.')
+                    val singleDot = filtered.indexOf('.') == filtered.lastIndexOf('.')
+                    if (singleDot && filtered.count { it == '.' } <= 1) {
+                        laborRateText = filtered.take(12)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                singleLine = true,
+                shape = RoundedCornerShape(6.dp),
+                label = { Text("Exact rate (${surface.effectiveMaterial.pricingAreaUnit.symbol})") },
+                supportingText = {
+                    Text(
+                        "Enter any rate, e.g. 1450.75 for LKR or INR labor.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                },
+                isError = laborRateText.toDoubleOrNull()?.let { it < 0.0 } == true,
+                trailingIcon = {
+                    TextButton(
+                        onClick = {
+                            val parsed = laborRateText.toDoubleOrNull()
+                            if (parsed != null && parsed >= 0.0) {
+                                laborSliderValue = parsed.toFloat()
+                                onAction(
+                                    QuoteAction.SetSurfaceLaborRate(surface.surfaceId, parsed)
+                                )
+                            }
+                        },
+                        enabled = laborRateText.toDoubleOrNull()?.let { it >= 0.0 } == true
+                    ) {
+                        Text("Set")
+                    }
+                }
             )
 
             surface.analysis?.let { analysis ->
@@ -398,10 +444,10 @@ fun SurfacePricingPanel(
                 modifier = Modifier.padding(vertical = 14.dp),
                 color = MaterialTheme.colorScheme.outlineVariant
             )
-            Row(
+            FlowRow(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.End,
-                verticalAlignment = Alignment.CenterVertically
+                horizontalArrangement = Arrangement.spacedBy(2.dp),
+                verticalArrangement = Arrangement.spacedBy(0.dp)
             ) {
                 TextButton(
                     onClick = { confirmDelete = true },
@@ -421,13 +467,13 @@ fun SurfacePricingPanel(
                 TextButton(onClick = onRemeasure) {
                     Text("Re-measure in AR")
                 }
-                Spacer(Modifier.weight(1f))
-                Text(
-                    text = "Editable at any time",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
             }
+            Text(
+                text = "Editable at any time",
+                modifier = Modifier.padding(top = 4.dp),
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
     }
 
@@ -489,4 +535,15 @@ private fun formatQuantity(quantity: Double): String =
         String.format(Locale.US, "%.0f", quantity)
     } else {
         String.format(Locale.US, "%.2f", quantity)
+    }
+
+/** Keeps the slider usable for high-denomination currencies such as LKR, INR, and JPY. */
+private fun laborSliderCeiling(currentValue: Float): Float =
+    maxOf(200f, currentValue * 1.25f)
+
+private fun trimTrailingZeros(value: Double): String =
+    if (value % 1.0 == 0.0) {
+        String.format(Locale.US, "%.0f", value)
+    } else {
+        String.format(Locale.US, "%.2f", value)
     }
