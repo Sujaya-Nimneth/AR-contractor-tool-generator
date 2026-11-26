@@ -22,6 +22,8 @@ import com.arcontractor.estimator.domain.estimation.WastePreset
 import com.arcontractor.estimator.domain.geometry.CutoutKind
 import com.arcontractor.estimator.domain.geometry.ManualCutoutSpec
 import com.arcontractor.estimator.domain.geometry.ManualSurfaceBuilder
+import com.arcontractor.estimator.domain.geometry.ManualSurfaceOrientation
+import com.arcontractor.estimator.domain.geometry.SurfaceOrientation
 import com.arcontractor.estimator.domain.geometry.UnitConverter
 import java.util.UUID
 import kotlinx.coroutines.Job
@@ -337,17 +339,51 @@ class QuoteViewModel(
         val target = replaceSurfaceId?.let { id ->
             _uiState.value.workspace?.surfaces?.firstOrNull { it.surfaceId == id }
         }
+        val prefill = target?.let(::dimensionPrefill)
         _uiState.update {
             it.copy(
                 isManualEntryOpen = true,
                 manualSurfaceDraft = ManualSurfaceDraft(
                     name = target?.surfaceName ?: "",
+                    widthText = prefill?.widthText.orEmpty(),
+                    heightText = prefill?.heightText.orEmpty(),
+                    orientation = prefill?.orientation ?: ManualSurfaceOrientation.WALL,
                     replaceSurfaceId = target?.surfaceId
                 ),
                 message = null
             )
         }
     }
+
+    /**
+     * Derives an editable width/height for the manual dialog from a saved surface's 2D extents, so
+     * "re-enter dimensions" starts from the current measurement instead of blank fields.
+     */
+    private fun dimensionPrefill(surface: SurfaceQuoteLine): DimensionPrefill? {
+        val analysis = surface.analysis ?: return null
+        val box = analysis.boundingBox2D
+        if (box.widthMeters <= 0.0 || box.heightMeters <= 0.0) return null
+        val orientation = when (analysis.basis.orientation) {
+            SurfaceOrientation.HORIZONTAL_FLOOR,
+            SurfaceOrientation.HORIZONTAL_CEILING -> ManualSurfaceOrientation.FLOOR
+
+            else -> ManualSurfaceOrientation.WALL
+        }
+        return DimensionPrefill(
+            widthText = formatMetersForInput(box.widthMeters),
+            heightText = formatMetersForInput(box.heightMeters),
+            orientation = orientation
+        )
+    }
+
+    private fun formatMetersForInput(meters: Double): String =
+        String.format(java.util.Locale.US, "%.3f", meters)
+
+    private data class DimensionPrefill(
+        val widthText: String,
+        val heightText: String,
+        val orientation: ManualSurfaceOrientation
+    )
 
     private fun saveManualSurface() {
         val draft = _uiState.value.manualSurfaceDraft ?: return

@@ -1,5 +1,6 @@
 package com.arcontractor.estimator.ui.quote
 
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -67,6 +68,7 @@ fun ManualSurfaceDialog(
                     .verticalScroll(rememberScrollState()),
                 verticalArrangement = Arrangement.spacedBy(11.dp)
             ) {
+                DialogErrorBanner(message = state.message)
                 OutlinedTextField(
                     value = draft.name,
                     onValueChange = {
@@ -253,7 +255,12 @@ private fun ManualCutoutRow(
             )
             TextButton(onClick = onRemove) { Text("Remove") }
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .horizontalScroll(rememberScrollState()),
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
+        ) {
             CutoutKind.entries.forEach { kind ->
                 FilterChip(
                     selected = cutout.kind == kind,

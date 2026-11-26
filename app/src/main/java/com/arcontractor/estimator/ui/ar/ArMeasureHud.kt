@@ -61,6 +61,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.arcontractor.estimator.domain.geometry.CutoutKind
+import com.arcontractor.estimator.ui.quote.DisplayUnitSystem
 import java.util.Locale
 
 private val HudAmber = Color(0xFFFFB547)
@@ -73,6 +74,8 @@ private val HudLine = Color(0x33FFFFFF)
 @Composable
 internal fun MeasurementTopHud(
     state: ArMeasureUiState,
+    units: DisplayUnitSystem,
+    onSetUnits: (DisplayUnitSystem) -> Unit,
     onBackToQuote: () -> Unit
 ) {
     Column(
@@ -134,10 +137,12 @@ internal fun MeasurementTopHud(
             }
         }
 
-        Spacer(Modifier.height(14.dp))
+        Spacer(Modifier.height(10.dp))
+        UnitToggle(units = units, onSetUnits = onSetUnits)
+        Spacer(Modifier.height(10.dp))
         PhaseProgress(state.phase)
         Spacer(Modifier.height(12.dp))
-        MetricStrip(state)
+        MetricStrip(state = state, units = units)
         state.surfaceAnalysis?.let { analysis ->
             Spacer(Modifier.height(8.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -486,7 +491,7 @@ private fun PhaseProgress(phase: ArMeasurePhase) {
 }
 
 @Composable
-private fun MetricStrip(state: ArMeasureUiState) {
+private fun MetricStrip(state: ArMeasureUiState, units: DisplayUnitSystem) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -495,17 +500,17 @@ private fun MetricStrip(state: ArMeasureUiState) {
     ) {
         MetricTile(
             label = "EDGE",
-            value = formatLength(state.liveEdgeMeters ?: state.lastMeasuredEdgeMeters),
+            value = formatLength(state.liveEdgeMeters ?: state.lastMeasuredEdgeMeters, units),
             accent = HudAmber
         )
         MetricTile(
             label = if (state.outerClosed) "NET AREA" else "AREA",
-            value = formatArea(state.netAreaSqMeters),
+            value = formatArea(state.netAreaSqMeters, units),
             accent = HudCyan
         )
         MetricTile(
             label = "PERIMETER",
-            value = formatLength(state.outerPerimeterMeters),
+            value = formatLength(state.outerPerimeterMeters, units),
             accent = Color.White.copy(alpha = 0.88f)
         )
         MetricTile(
@@ -748,11 +753,57 @@ private fun CutoutKind.shortLabel(): String = when (this) {
     CutoutKind.OTHER -> "OTHER"
 }
 
-private fun formatLength(meters: Double?): String =
-    meters?.let { String.format(Locale.US, "%.2f m", it) } ?: "--"
+private fun formatLength(meters: Double?, units: DisplayUnitSystem): String =
+    meters?.let {
+        when (units) {
+            DisplayUnitSystem.METRIC -> String.format(Locale.US, "%.2f m", it)
+            DisplayUnitSystem.IMPERIAL -> com.arcontractor.estimator.domain.geometry
+                .UnitConverter.formatArchitecturalFeetInches(it)
+        }
+    } ?: "--"
 
-private fun formatArea(squareMeters: Double?): String =
-    squareMeters?.let { String.format(Locale.US, "%.2f m2", it) } ?: "--"
+private fun formatArea(squareMeters: Double?, units: DisplayUnitSystem): String =
+    squareMeters?.let {
+        when (units) {
+            DisplayUnitSystem.METRIC -> String.format(Locale.US, "%.2f m²", it)
+            DisplayUnitSystem.IMPERIAL -> String.format(
+                Locale.US,
+                "%.1f ft²",
+                com.arcontractor.estimator.domain.geometry.UnitConverter.sqMetersToSqFeet(it)
+            )
+        }
+    } ?: "--"
 
 private fun formatMillimeters(millimeters: Double): String =
     String.format(Locale.US, "%.1f mm", millimeters)
+
+/** Compact metric/imperial switch for the AR readouts (storage and math stay SI). */
+@Composable
+private fun UnitToggle(
+    units: DisplayUnitSystem,
+    onSetUnits: (DisplayUnitSystem) -> Unit
+) {
+    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        listOf(
+            DisplayUnitSystem.METRIC to "m / m²",
+            DisplayUnitSystem.IMPERIAL to "ft / ft²"
+        ).forEach { (system, label) ->
+            FilterChip(
+                selected = units == system,
+                onClick = { onSetUnits(system) },
+                label = {
+                    Text(
+                        text = label,
+                        fontSize = 10.sp,
+                        fontFamily = FontFamily.Monospace
+                    )
+                },
+                shape = RoundedCornerShape(6.dp),
+                colors = FilterChipDefaults.filterChipColors(
+                    selectedContainerColor = HudAmber.copy(alpha = 0.22f),
+                    selectedLabelColor = HudAmber
+                )
+            )
+        }
+    }
+}

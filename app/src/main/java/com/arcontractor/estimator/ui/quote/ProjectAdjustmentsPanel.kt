@@ -10,12 +10,15 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -32,6 +35,15 @@ fun ProjectAdjustmentsPanel(
     modifier: Modifier = Modifier
 ) {
     var sliderValue by remember(taxRate) { mutableFloatStateOf(taxRate.toFloat()) }
+    var rateText by remember(taxRate) {
+        mutableStateOf(String.format(Locale.US, "%.2f", taxRate * 100.0))
+    }
+
+    fun commitRate(percent: Double) {
+        val clamped = percent.coerceIn(0.0, 100.0)
+        sliderValue = (clamped / 100.0).toFloat()
+        onAction(QuoteAction.SetProjectTaxRate(clamped / 100.0))
+    }
 
     Surface(
         modifier = modifier.fillMaxWidth(),
@@ -63,16 +75,51 @@ fun ProjectAdjustmentsPanel(
 
             Slider(
                 value = sliderValue,
-                onValueChange = { sliderValue = it },
+                onValueChange = {
+                    sliderValue = it
+                    rateText = String.format(Locale.US, "%.2f", it * 100f)
+                },
                 onValueChangeFinished = {
                     onAction(QuoteAction.SetProjectTaxRate(sliderValue.toDouble()))
                 },
                 valueRange = 0f..1f,
-                steps = 199,
                 modifier = Modifier.padding(top = 10.dp)
+            )
+            OutlinedTextField(
+                value = rateText,
+                onValueChange = { raw ->
+                    val filtered = raw.filter { it.isDigit() || it == '.' }
+                    if (filtered.count { it == '.' } <= 1) {
+                        rateText = filtered.take(6)
+                    }
+                },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(top = 4.dp),
+                singleLine = true,
+                shape = RoundedCornerShape(6.dp),
+                label = { Text("Exact tax rate (%)") },
+                supportingText = {
+                    Text(
+                        "Type any rate, e.g. 8.25 or 18.75, then tap Set.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                },
+                isError = (rateText.toDoubleOrNull() ?: 0.0) > 100.0,
+                trailingIcon = {
+                    TextButton(
+                        onClick = {
+                            rateText.toDoubleOrNull()?.let(::commitRate)
+                        },
+                        enabled = rateText.toDoubleOrNull()?.let { it in 0.0..100.0 } == true
+                    ) {
+                        Text("Set")
+                    }
+                }
             )
             Text(
                 text = "Supports 0–100%. Set to 0% when the project is not taxable.",
+                modifier = Modifier.padding(top = 6.dp),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

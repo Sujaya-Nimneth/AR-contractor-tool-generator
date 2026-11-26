@@ -318,12 +318,20 @@ class PdfQuoteGenerator(
 
         val baseline = top + 20f
         canvas.drawText("CURRENT TOTAL", margin + 16f, baseline, labelPaint(7.8f, MUTED_INK))
-        canvas.drawText(
-            PdfQuoteFormat.money(context.workspace.quote.grandTotal, context.currencyCode),
-            margin + 16f,
-            top + 56f,
-            moneyPaint(30f, INK)
+        val factWidth = 92f
+        val factsLeft = width - margin - 16f - factWidth * 2f
+        val totalLeft = margin + 16f
+        val totalText = PdfQuoteFormat.money(
+            context.workspace.quote.grandTotal,
+            context.currencyCode
         )
+        val totalPaint = fittedMoneyPaint(
+            text = totalText,
+            maxSize = 30f,
+            minSize = 16f,
+            maxWidth = (factsLeft - totalLeft - 12f).coerceAtLeast(40f)
+        )
+        canvas.drawText(totalText, totalLeft, top + 56f, totalPaint)
         canvas.drawText(
             "Includes materials, consumables, labor, and tax",
             margin + 16f,
@@ -331,8 +339,6 @@ class PdfQuoteGenerator(
             bodyPaint(7.8f, MUTED_INK)
         )
 
-        val factWidth = 92f
-        val factsLeft = width - margin - 16f - factWidth * 2f
         drawHeroFact(
             canvas,
             factsLeft,
@@ -1040,6 +1046,25 @@ class PdfQuoteGenerator(
         paint.textAlign = Paint.Align.RIGHT
         canvas.drawText(text, right, baseline, paint)
         paint.textAlign = originalAlign
+    }
+
+    /**
+     * Shrinks a money label from [maxSize] down to [minSize] until it fits [maxWidth], so long
+     * formatted totals (for example `Rs 12,450,000.00`) never collide with the facts column.
+     */
+    internal fun fittedMoneyPaint(
+        text: String,
+        maxSize: Float,
+        minSize: Float,
+        maxWidth: Float
+    ): Paint {
+        var size = maxSize
+        var paint = moneyPaint(size, INK)
+        while (size > minSize && paint.measureText(text) > maxWidth) {
+            size = (size - 0.5f).coerceAtLeast(minSize)
+            paint = moneyPaint(size, INK)
+        }
+        return paint
     }
 
     private fun fitText(text: String, paint: Paint, maxWidth: Float): String {

@@ -203,3 +203,31 @@ fun LedgerValueRow(
         )
     }
 }
+
+/**
+ * Inline error banner for modal dialogs. Quote errors otherwise render behind the dialog scrim,
+ * where the contractor cannot see the validation failure they just triggered.
+ */
+@Composable
+fun DialogErrorBanner(
+    message: QuoteMessage?,
+    modifier: Modifier = Modifier
+) {
+    if (message?.isError != true) return
+    val accent = MaterialTheme.colorScheme.error
+    Box(
+        modifier = modifier
+            .fillMaxWidth()
+            .background(
+                color = accent.copy(alpha = 0.10f),
+                shape = RoundedCornerShape(6.dp)
+            )
+            .padding(horizontal = 11.dp, vertical = 8.dp)
+    ) {
+        Text(
+            text = message.text,
+            style = MaterialTheme.typography.bodySmall,
+            color = accent
+        )
+    }
+}
