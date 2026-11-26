@@ -20,3 +20,8 @@ captures/
 
 # macOS
 .DS_Store
+
+# Release signing material — never commit keystores or their passwords
+*.jks
+*.keystore
+keystore.properties
