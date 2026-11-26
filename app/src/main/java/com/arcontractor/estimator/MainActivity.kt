@@ -44,7 +44,8 @@ private fun EstimatorApp(container: AppContainer) {
         factory = QuoteViewModel.Factory(
             projectRepository = container.projectRepository,
             materialCatalogRepository = container.materialCatalogRepository,
-            quotePdfExporter = container.quotePdfExporter
+            quotePdfExporter = container.quotePdfExporter,
+            updateGateway = container.updateCoordinator
         )
     )
     val context = LocalContext.current

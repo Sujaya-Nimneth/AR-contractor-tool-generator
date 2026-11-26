@@ -8,6 +8,7 @@ import com.arcontractor.estimator.data.repository.ProjectRepository
 import com.arcontractor.estimator.data.repository.RoomMaterialCatalogRepository
 import com.arcontractor.estimator.data.repository.RoomProjectRepository
 import com.arcontractor.estimator.data.repository.MaterialCatalogRepository
+import com.arcontractor.estimator.data.update.UpdateCoordinator
 
 class EstimatorApplication : Application() {
     lateinit var container: AppContainer
@@ -37,4 +38,6 @@ class AppContainer(application: Application) {
 
     val quotePdfExporter: QuotePdfExporter =
         AndroidQuotePdfExporter(application)
+
+    val updateCoordinator: UpdateCoordinator = UpdateCoordinator(application)
 }
