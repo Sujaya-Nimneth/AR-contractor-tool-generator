@@ -11,6 +11,10 @@ import com.arcontractor.estimator.data.pdf.PdfExportOptions
 import com.arcontractor.estimator.data.pdf.PdfExportResult
 import com.arcontractor.estimator.data.pdf.QuotePdfExporter
 import com.arcontractor.estimator.data.repository.ProjectWorkspace
+import com.arcontractor.estimator.data.update.ReleaseManifest
+import com.arcontractor.estimator.data.update.UpdateCheckResult
+import com.arcontractor.estimator.data.update.UpdateDownloadResult
+import com.arcontractor.estimator.data.update.UpdateGateway
 import com.arcontractor.estimator.domain.estimation.TaxPolicy
 import com.arcontractor.estimator.domain.estimation.WastePreset
 import com.arcontractor.estimator.domain.geometry.Vec3
@@ -630,8 +634,78 @@ class QuoteViewModelTest {
             assertTrue(state.workspace?.project?.id != secondProjectId)
         }
 
+    @Test
+    fun `an available update surfaces a dismissible banner`() = runTest {
+        val manifest = ReleaseManifest(
+            versionCode = 999,
+            versionName = "9.9.9",
+            apkFileName = "update.apk",
+            apkSha256 = "abc",
+            downloadUrl = "https://example.invalid/update.apk"
+        )
+        val viewModel = createViewModel(
+            updateGateway = RecordingUpdateGateway(
+                checkResult = UpdateCheckResult.UpdateAvailable(manifest)
+            )
+        )
+
+        viewModel.onAction(QuoteAction.CheckForUpdates)
+
+        val update = viewModel.uiState.value.update
+        assertTrue(update.hasUpdate)
+        assertEquals("9.9.9", update.availableVersionName)
+        assertEquals(999, update.availableVersionCode)
+        assertFalse(update.isChecking)
+
+        viewModel.onAction(QuoteAction.DismissUpdate)
+        assertFalse(viewModel.uiState.value.update.hasUpdate)
+    }
+
+    @Test
+    fun `an up to date check clears the banner and reports the latest build`() = runTest {
+        val viewModel = createViewModel(
+            updateGateway = RecordingUpdateGateway(
+                checkResult = UpdateCheckResult.UpToDate
+            )
+        )
+
+        viewModel.onAction(QuoteAction.CheckForUpdates)
+
+        val state = viewModel.uiState.value
+        assertFalse(state.update.hasUpdate)
+        assertEquals("You are on the latest build.", state.message?.text)
+    }
+
+    @Test
+    fun `a failed update check never blocks the quote workspace`() = runTest {
+        val viewModel = createViewModel(
+            updateGateway = RecordingUpdateGateway(
+                checkResult = UpdateCheckResult.Failed("offline")
+            )
+        )
+
+        viewModel.onAction(QuoteAction.CheckForUpdates)
+
+        val state = viewModel.uiState.value
+        assertFalse(state.update.hasUpdate)
+        assertFalse(state.update.isChecking)
+        assertTrue(state.message?.isError == true)
+        assertNotNull(state.workspace)
+    }
+
+    @Test
+    fun `the update coordinator is optional for local test builds`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.onAction(QuoteAction.CheckForUpdates)
+
+        assertFalse(viewModel.uiState.value.update.hasUpdate)
+        assertNotNull(viewModel.uiState.value.workspace)
+    }
+
     private fun createViewModel(
-        exporter: QuotePdfExporter = RecordingQuotePdfExporter()
+        exporter: QuotePdfExporter = RecordingQuotePdfExporter(),
+        updateGateway: UpdateGateway? = null
     ): QuoteViewModel {
         val projectDao = FakeProjectDao()
         val surfaceDao = FakeSurfaceDao()
@@ -654,9 +728,21 @@ class QuoteViewModelTest {
             QuoteViewModel.Factory(
                 projectRepository = projectRepository,
                 materialCatalogRepository = materialRepository,
-                quotePdfExporter = exporter
+                quotePdfExporter = exporter,
+                updateGateway = updateGateway
             )
         )[QuoteViewModel::class.java]
+    }
+
+    private class RecordingUpdateGateway(
+        private val checkResult: UpdateCheckResult
+    ) : UpdateGateway {
+        override suspend fun check(): UpdateCheckResult = checkResult
+
+        override suspend fun download(): UpdateDownloadResult =
+            UpdateDownloadResult.Failed("not configured for this test")
+
+        override fun openReleasePage() = Unit
     }
 
     private class RecordingQuotePdfExporter : QuotePdfExporter {
