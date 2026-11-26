@@ -204,6 +204,16 @@ private fun QuoteWorkspace(
                 )
             }
 
+            if (state.update.hasUpdate) {
+                item {
+                    UpdateBanner(
+                        update = state.update,
+                        onDownload = { onAction(QuoteAction.DownloadUpdate) },
+                        onDismiss = { onAction(QuoteAction.DismissUpdate) }
+                    )
+                }
+            }
+
             if (state.message != null) {
                 item {
                     MessageBanner(
@@ -364,12 +374,26 @@ private fun QuoteWorkspace(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Text(
-                        text = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
-                        modifier = Modifier.padding(top = 2.dp),
-                        style = MaterialTheme.typography.labelSmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(
+                            text = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                        )
+                        TextButton(
+                            onClick = { onAction(QuoteAction.CheckForUpdates) },
+                            enabled = !state.update.isChecking
+                        ) {
+                            Text(
+                                text = if (state.update.isChecking) {
+                                    "Checking…"
+                                } else {
+                                    "Check for updates"
+                                },
+                                style = MaterialTheme.typography.labelSmall
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -552,6 +576,57 @@ private fun QuoteTitleRow(
                 )
             ) {
                 Text("Add surface")
+            }
+        }
+    }
+}
+
+/**
+ * Dismissible in-app update banner. It only appears when a newer GitHub release is published and
+ * never blocks the quote workspace.
+ */
+@Composable
+private fun UpdateBanner(
+    update: UpdateUiState,
+    onDownload: () -> Unit,
+    onDismiss: () -> Unit
+) {
+    Surface(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 14.dp),
+        shape = RoundedCornerShape(8.dp),
+        color = MaterialTheme.colorScheme.secondaryContainer,
+        border = androidx.compose.foundation.BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.secondary.copy(alpha = 0.55f)
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(start = 13.dp, top = 8.dp, bottom = 8.dp, end = 3.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    text = "Update ${update.availableVersionName} is available",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer
+                )
+                Text(
+                    text = "Installs over this build and keeps your saved quotes.",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSecondaryContainer.copy(alpha = 0.78f)
+                )
+            }
+            TextButton(onClick = onDownload, enabled = !update.isDownloading) {
+                Text(if (update.isDownloading) "Downloading…" else "Download")
+            }
+            IconButton(onClick = onDismiss) {
+                Icon(
+                    imageVector = Icons.Rounded.Close,
+                    contentDescription = "Dismiss update notice",
+                    tint = MaterialTheme.colorScheme.onSecondaryContainer
+                )
             }
         }
     }
