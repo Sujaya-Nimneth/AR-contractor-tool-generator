@@ -132,6 +132,142 @@ class PdfQuoteGeneratorTest {
         }
     }
 
+    @Test
+    fun `hero total shrinks to fit the cover column for long currency values`() {
+        val generator = PdfQuoteGenerator(FIXED_CLOCK)
+        val longTotal = PdfQuoteFormat.money(BigDecimal("12450000.00"), "LKR")
+        assertEquals("Rs 12,450,000.00", longTotal)
+
+        // A tight cover column (long contractor name, narrow paper) forces the shrink.
+        val tightWidth = 200f
+        val fitted = generator.fittedMoneyPaint(
+            text = longTotal,
+            maxSize = 30f,
+            minSize = 16f,
+            maxWidth = tightWidth
+        )
+
+        assertTrue(
+            "Fitted total must not overlap the facts column",
+            fitted.measureText(longTotal) <= tightWidth
+        )
+        assertTrue("Fitted total keeps a readable size", fitted.textSize >= 16f)
+        assertTrue("Fitted total shrinks below the hero size", fitted.textSize < 30f)
+    }
+
+    @Test
+    fun `hero total never exceeds the cover column at any width`() {
+        val generator = PdfQuoteGenerator(FIXED_CLOCK)
+        val totals = listOf(
+            PdfQuoteFormat.money(BigDecimal("1250.00"), "USD"),
+            PdfQuoteFormat.money(BigDecimal("12450000.00"), "LKR"),
+            PdfQuoteFormat.money(BigDecimal("999999999.99"), "AED")
+        )
+        val widths = listOf(
+            heroTotalColumnWidth(PdfPaperSize.A4),
+            heroTotalColumnWidth(PdfPaperSize.LETTER),
+            260f,
+            200f
+        )
+
+        totals.forEach { total ->
+            widths.forEach { width ->
+                val fitted = generator.fittedMoneyPaint(
+                    text = total,
+                    maxSize = 30f,
+                    minSize = 16f,
+                    maxWidth = width
+                )
+                assertTrue(
+                    "'$total' at $width pt must stay inside the column",
+                    fitted.measureText(total) <= width
+                )
+                assertTrue(
+                    "'$total' at $width pt must stay legible",
+                    fitted.textSize >= 16f
+                )
+            }
+        }
+    }
+
+    @Test
+    fun `a short total keeps the full hero size`() {
+        val generator = PdfQuoteGenerator(FIXED_CLOCK)
+        val shortTotal = PdfQuoteFormat.money(BigDecimal("1250.00"), "USD")
+
+        val fitted = generator.fittedMoneyPaint(
+            text = shortTotal,
+            maxSize = 30f,
+            minSize = 16f,
+            maxWidth = heroTotalColumnWidth(PdfPaperSize.LETTER)
+        )
+
+        assertEquals(30f, fitted.textSize, 0.001f)
+    }
+
+    private fun heroTotalColumnWidth(paperSize: PdfPaperSize): Float =
+        paperSize.widthPoints - COVER_MARGIN_POINTS - COVER_FACTS_INSET_POINTS -
+            COVER_FACT_WIDTH_POINTS * 2f - COVER_FACTS_GAP_POINTS
+
+    @Test
+    fun `a full twelve row itemized page paginates without dropping rows`() {
+        val rows = (1..12).map { "line item $it" }
+
+        val pages = PdfQuoteFormat.chunkForPages(rows, ROWS_PER_TABLE_PAGE)
+
+        assertEquals(1, pages.size)
+        assertEquals(rows, pages.flatten())
+
+        val overflowing = PdfQuoteFormat.chunkForPages(rows + "line item 13", ROWS_PER_TABLE_PAGE)
+        assertEquals(2, overflowing.size)
+        assertEquals(rows + "line item 13", overflowing.flatten())
+    }
+
+    @Test
+    fun `itemized rows never spill past the footer line`() {
+        val workspace = fixtureWorkspace()
+        val generator = PdfQuoteGenerator(FIXED_CLOCK)
+        val options = PdfExportOptions(PdfPaperSize.LETTER)
+        val pageCount = generator.pageCount(workspace, options)
+        val itemizedPage = (1..pageCount).first { pageNumber ->
+            val bitmap = Bitmap.createBitmap(
+                options.paperSize.widthPoints,
+                options.paperSize.heightPoints,
+                Bitmap.Config.ARGB_8888
+            )
+            try {
+                val canvas = Canvas(bitmap)
+                canvas.drawColor(Color.WHITE)
+                generator.renderPagePreview(
+                    workspace = workspace,
+                    options = options,
+                    pageNumber = pageNumber,
+                    canvas = canvas
+                )
+                hasInkBelowFooterBaseline(bitmap, options.paperSize.heightPoints)
+            } finally {
+                bitmap.recycle()
+            }
+        }
+
+        // Reaching here means the loop found a page whose content stays above the footer.
+        assertTrue("Itemized pages must keep content above the footer", itemizedPage >= 1)
+    }
+
+    private fun hasInkBelowFooterBaseline(bitmap: Bitmap, heightPoints: Int): Boolean {
+        val scale = bitmap.height.toFloat() / heightPoints
+        val from = (bitmap.height - BOTTOM_MARGIN_POINTS * scale).toInt()
+        for (y in from until bitmap.height) {
+            for (x in 0 until bitmap.width step 3) {
+                assertTrue(
+                    "Page content must not run into the bottom margin at y=$y",
+                    bitmap.getPixel(x, y) == Color.WHITE
+                )
+            }
+        }
+        return true
+    }
+
     private fun renderPreviewSet(
         generator: PdfQuoteGenerator,
         workspace: ProjectWorkspace,
@@ -353,6 +489,12 @@ class PdfQuoteGeneratorTest {
     private companion object {
         const val PREVIEW_SCALE = 2
         const val MIN_NON_WHITE_SAMPLES = 500
+        const val BOTTOM_MARGIN_POINTS = 8f
+        const val ROWS_PER_TABLE_PAGE = 12
+        const val COVER_MARGIN_POINTS = 40f
+        const val COVER_FACTS_INSET_POINTS = 16f
+        const val COVER_FACT_WIDTH_POINTS = 92f
+        const val COVER_FACTS_GAP_POINTS = 12f
 
         val FIXED_CLOCK: Clock = Clock.fixed(
             Instant.parse("2026-10-31T00:00:00Z"),

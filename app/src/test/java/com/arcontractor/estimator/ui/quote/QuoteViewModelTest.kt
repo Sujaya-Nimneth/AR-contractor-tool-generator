@@ -20,6 +20,7 @@ import org.junit.After
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Rule
 import org.junit.Test
@@ -486,6 +487,41 @@ class QuoteViewModelTest {
         assertEquals("107.6 ft²", formatArea(10.0, DisplayUnitSystem.IMPERIAL))
         assertEquals("2.44 m", formatLength(2.4384))
         assertEquals("8' 0\"", formatLength(2.4384, DisplayUnitSystem.IMPERIAL))
+    }
+
+    @Test
+    fun `re-entering dimensions prefills the saved surface extents`() = runTest {
+        val viewModel = createViewModel()
+        viewModel.onAction(
+            QuoteAction.SaveMeasurement(
+                MeasurementCapture(
+                    outerVertices = RECTANGLE,
+                    referenceNormal = Vec3(0.0, 0.0, 1.0),
+                    cutouts = emptyList(),
+                    name = "Prefill wall"
+                )
+            )
+        )
+        val surfaceId = viewModel.uiState.value.selectedSurfaceId ?: error("Missing surface")
+
+        viewModel.onAction(QuoteAction.OpenManualEntry(surfaceId))
+
+        val draft = viewModel.uiState.value.manualSurfaceDraft ?: error("Missing manual draft")
+        assertEquals("Prefill wall", draft.name)
+        assertEquals(3.0, draft.widthText.toDouble(), 1e-3)
+        assertEquals(2.0, draft.heightText.toDouble(), 1e-3)
+    }
+
+    @Test
+    fun `a brand new manual entry starts with empty dimensions`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.onAction(QuoteAction.OpenManualEntry())
+
+        val draft = viewModel.uiState.value.manualSurfaceDraft ?: error("Missing manual draft")
+        assertEquals("", draft.widthText)
+        assertEquals("", draft.heightText)
+        assertNull(draft.replaceSurfaceId)
     }
 
     @Test
