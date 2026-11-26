@@ -11,6 +11,9 @@ import com.arcontractor.estimator.data.repository.SurfaceMeasurementDraft
 import com.arcontractor.estimator.data.repository.SurfaceQuoteLine
 import com.arcontractor.estimator.data.pdf.PdfExportOptions
 import com.arcontractor.estimator.data.pdf.QuotePdfExporter
+import com.arcontractor.estimator.data.update.UpdateCheckResult
+import com.arcontractor.estimator.data.update.UpdateGateway
+import com.arcontractor.estimator.data.update.UpdateDownloadResult
 import com.arcontractor.estimator.domain.estimation.DefaultMaterialCatalog
 import com.arcontractor.estimator.domain.estimation.MaterialSpec
 import com.arcontractor.estimator.domain.estimation.PackageUnitType
@@ -37,6 +40,7 @@ class QuoteViewModel(
     private val projectRepository: ProjectRepository,
     private val materialCatalogRepository: MaterialCatalogRepository,
     private val quotePdfExporter: QuotePdfExporter,
+    private val updateGateway: UpdateGateway? = null,
     private val idGenerator: () -> String = { UUID.randomUUID().toString() }
 ) : ViewModel() {
 
@@ -147,6 +151,11 @@ class QuoteViewModel(
             QuoteAction.SaveCatalogMaterial -> saveCatalogMaterial()
             QuoteAction.DeleteCatalogMaterial -> deleteCatalogMaterial()
             QuoteAction.DismissMessage -> _uiState.update { it.copy(message = null) }
+            QuoteAction.CheckForUpdates -> checkForUpdates()
+            QuoteAction.DownloadUpdate -> downloadUpdate()
+            QuoteAction.DismissUpdate -> _uiState.update {
+                it.copy(update = it.update.copy(isDismissed = true))
+            }
         }
     }
 
@@ -772,6 +781,68 @@ class QuoteViewModel(
         }
     }
 
+    private fun checkForUpdates() {
+        val coordinator = updateGateway ?: return
+        if (_uiState.value.update.isChecking) return
+        _uiState.update { it.copy(update = it.update.copy(isChecking = true)) }
+        viewModelScope.launch {
+            val result = coordinator.check()
+            _uiState.update { current ->
+                when (result) {
+                    is UpdateCheckResult.UpdateAvailable -> current.copy(
+                        update = current.update.copy(
+                            availableVersionName = result.manifest.versionName,
+                            availableVersionCode = result.manifest.versionCode,
+                            isChecking = false,
+                            isDismissed = false
+                        )
+                    )
+
+                    UpdateCheckResult.UpToDate -> current.copy(
+                        update = UpdateUiState(),
+                        message = QuoteMessage("You are on the latest build.")
+                    )
+
+                    is UpdateCheckResult.Failed -> current.copy(
+                        update = current.update.copy(isChecking = false),
+                        message = QuoteMessage(
+                            "Update check unavailable: ${result.reason}",
+                            isError = true
+                        )
+                    )
+                }
+            }
+        }
+    }
+
+    private fun downloadUpdate() {
+        val coordinator = updateGateway ?: return
+        val update = _uiState.value.update
+        if (update.isDownloading || update.availableVersionCode == null) return
+        _uiState.update { it.copy(update = it.update.copy(isDownloading = true)) }
+        viewModelScope.launch {
+            val result = coordinator.download()
+            _uiState.update { current ->
+                current.copy(
+                    update = current.update.copy(isDownloading = false),
+                    message = when (result) {
+                        is UpdateDownloadResult.Ready -> QuoteMessage(
+                            "Update ${current.update.availableVersionName} verified. " +
+                                "Confirm the Android install prompt."
+                        )
+
+                        is UpdateDownloadResult.NeedsPermission -> QuoteMessage(
+                            "Allow installs from this app, then tap Download again.",
+                            isError = true
+                        )
+
+                        is UpdateDownloadResult.Failed -> QuoteMessage(result.reason, isError = true)
+                    }
+                )
+            }
+        }
+    }
+
     private fun surface(surfaceId: String): SurfaceQuoteLine? =
         _uiState.value.workspace?.surfaces?.firstOrNull { it.surfaceId == surfaceId }
 
@@ -873,7 +944,8 @@ class QuoteViewModel(
     class Factory(
         private val projectRepository: ProjectRepository,
         private val materialCatalogRepository: MaterialCatalogRepository,
-        private val quotePdfExporter: QuotePdfExporter
+        private val quotePdfExporter: QuotePdfExporter,
+        private val updateGateway: UpdateGateway? = null
     ) : ViewModelProvider.Factory {
         @Suppress("UNCHECKED_CAST")
         override fun <T : ViewModel> create(modelClass: Class<T>): T {
@@ -881,7 +953,8 @@ class QuoteViewModel(
             return QuoteViewModel(
                 projectRepository = projectRepository,
                 materialCatalogRepository = materialCatalogRepository,
-                quotePdfExporter = quotePdfExporter
+                quotePdfExporter = quotePdfExporter,
+                updateGateway = updateGateway
             ) as T
         }
     }
