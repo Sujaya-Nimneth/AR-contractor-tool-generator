@@ -266,6 +266,9 @@ class RoomProjectRepository(
         customWasteFactorOverride: Double?,
         laborRateOverride: Double?
     ) {
+        require(wastePresetOverride == null || wastePresetOverride in VALID_WASTE_PRESETS) {
+            "Waste preset '$wastePresetOverride' is not recognised."
+        }
         require(customWasteFactorOverride == null || customWasteFactorOverride in 0.0..1.0) {
             "Waste factor must be between 0% and 100%."
         }
@@ -360,7 +363,13 @@ class RoomProjectRepository(
 
         val cutouts = stored.cutouts
             .sortedBy(CutoutEntity::displayOrder)
-            .map(CutoutEntity::toDomain)
+            .mapNotNull { cutoutEntity ->
+                runCatching { cutoutEntity.toDomain() }.getOrElse {
+                    loadErrors += "Surface '${entity.name}' has a corrupt opening record " +
+                        "('${cutoutEntity.id}') that was skipped."
+                    null
+                }
+            }
         return runCatching {
             val analysis = PolygonGeometryEngine.analyze3DSurface(
                 outerVertices3D = entity.outerVertices,
@@ -449,9 +458,15 @@ class RoomProjectRepository(
     ): MaterialSpec {
         val wastePreset = wastePresetOverride?.let(WastePreset::valueOf)
             ?: material.wastePreset
+        // A non-CUSTOM preset must win outright; otherwise a catalog material's customWasteFactor
+        // would keep overriding the surface preset inside MaterialSpec.effectiveWasteFactor.
+        val customWasteFactor = when {
+            wastePreset != WastePreset.CUSTOM -> null
+            else -> customWasteFactorOverride ?: material.customWasteFactor
+        }
         return material.copy(
             wastePreset = wastePreset,
-            customWasteFactor = customWasteFactorOverride ?: material.customWasteFactor,
+            customWasteFactor = customWasteFactor,
             laborRatePerUnitArea = laborRateOverride ?: material.laborRatePerUnitArea
         )
     }
@@ -484,7 +499,11 @@ class RoomProjectRepository(
         return runCatching {
             material.copy(
                 wastePreset = wastePreset,
-                customWasteFactor = customFactor ?: material.customWasteFactor,
+                customWasteFactor = if (wastePreset == WastePreset.CUSTOM) {
+                    customFactor ?: material.customWasteFactor
+                } else {
+                    null
+                },
                 laborRatePerUnitArea = laborRate ?: material.laborRatePerUnitArea
             )
         }.getOrElse {
@@ -511,5 +530,6 @@ class RoomProjectRepository(
     private companion object {
         const val DEFAULT_PROJECT_ID = "default-project"
         const val DEFAULT_PROJECT_NAME = "Untitled contractor quote"
+        val VALID_WASTE_PRESETS: Set<String> = WastePreset.entries.map(WastePreset::name).toSet()
     }
 }

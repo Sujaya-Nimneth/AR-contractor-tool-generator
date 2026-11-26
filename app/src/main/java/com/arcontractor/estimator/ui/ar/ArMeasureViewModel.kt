@@ -161,7 +161,9 @@ class ArMeasureViewModel(
 
     private fun retrySession() {
         val current = _uiState.value
-        if (!current.canRetrySession) return
+        // A terminal camera-permission error is still retryable once the user grants access from
+        // Android settings, so only block when nothing at all can be restarted.
+        if (!current.canRetrySession && current.sessionErrorMessage == null) return
         _uiState.value = current.copy(
             isTracking = false,
             trackingFailureMessage = null,
@@ -171,6 +173,30 @@ class ArMeasureViewModel(
             isSessionRestartRequested = true,
             reticleSample = null,
             message = "Restarting AR session..."
+        )
+    }
+
+    /**
+     * Re-evaluates the session after returning from Android settings or the Play Store. Clears a
+     * resolved permission/install error and requests a fresh AR view when AR can now run.
+     */
+    fun onEnvironmentRechecked(canStartAr: Boolean) {
+        val current = _uiState.value
+        if (!canStartAr) {
+            // Nothing resolved; keep the existing guidance visible.
+            if (current.sessionErrorMessage != null) return
+            _uiState.value = current.copy(canRetrySession = true)
+            return
+        }
+        val hadBlockingError = current.sessionErrorMessage != null ||
+            current.sessionRecoveryAction != null
+        _uiState.value = current.copy(
+            isTracking = true,
+            sessionErrorMessage = null,
+            sessionRecoveryAction = null,
+            canRetrySession = false,
+            isSessionRestartRequested = true,
+            message = if (hadBlockingError) "AR session restarting..." else current.message
         )
     }
 

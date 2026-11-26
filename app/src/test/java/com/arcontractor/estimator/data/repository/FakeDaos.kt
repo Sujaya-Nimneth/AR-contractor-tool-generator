@@ -98,6 +98,18 @@ class FakeSurfaceDao : SurfaceDao {
         }
     }
 
+    fun corruptCutoutKind(surfaceId: String, kindName: String) {
+        surfaces.value = surfaces.value.map { stored ->
+            if (stored.surface.id == surfaceId) {
+                stored.copy(
+                    cutouts = stored.cutouts.map { cutout -> cutout.copy(kind = kindName) }
+                )
+            } else {
+                stored
+            }
+        }
+    }
+
     override fun observeForProject(projectId: String): Flow<List<SurfaceWithCutouts>> =
         surfaces.map { list ->
             list.filter { it.surface.projectId == projectId }

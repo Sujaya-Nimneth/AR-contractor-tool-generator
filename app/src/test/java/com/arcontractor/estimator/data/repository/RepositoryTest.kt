@@ -287,6 +287,97 @@ class RepositoryTest {
         assertNull(surface.loadError)
     }
 
+    @Test
+    fun `surface preset override clears a catalog material custom waste factor`() = runTest {
+        val fixtures = RepositoryFixtures()
+        val projectId = fixtures.projectRepository.ensureDefaultProject()
+        val customMaterial = DefaultMaterialCatalog.porcelainTile300x600Straight.copy(
+            id = "custom-waste-material",
+            name = "Custom waste tile",
+            wastePreset = WastePreset.CUSTOM,
+            customWasteFactor = 0.22
+        )
+        fixtures.materialRepository.save(customMaterial)
+        val surfaceId = fixtures.projectRepository.addSurface(
+            projectId = projectId,
+            draft = SurfaceMeasurementDraft(
+                name = "Straight lay wall",
+                outerVertices = RECTANGLE_6_SQ_METERS,
+                referenceNormal = Vec3(0.0, 0.0, 1.0),
+                cutouts = emptyList(),
+                materialId = customMaterial.id,
+                wastePresetOverride = WastePreset.STRAIGHT_LAY.name
+            )
+        )
+
+        val workspace = fixtures.projectRepository.observeWorkspace(projectId)
+            .filterNotNull()
+            .first()
+
+        val surface = workspace.surfaces.single { it.surfaceId == surfaceId }
+        assertEquals(WastePreset.STRAIGHT_LAY, surface.effectiveMaterial.wastePreset)
+        assertNull(surface.effectiveMaterial.customWasteFactor)
+        assertEquals(WastePreset.STRAIGHT_LAY.defaultFactor, surface.estimate?.wasteFactor ?: -1.0, 1e-9)
+    }
+
+    @Test
+    fun `updateSurfaceSettings rejects an unknown waste preset`() = runTest {
+        val fixtures = RepositoryFixtures()
+        val projectId = fixtures.projectRepository.ensureDefaultProject()
+        val surfaceId = fixtures.projectRepository.addSurface(
+            projectId = projectId,
+            draft = SurfaceMeasurementDraft(
+                name = "Guarded wall",
+                outerVertices = RECTANGLE_6_SQ_METERS,
+                referenceNormal = Vec3(0.0, 0.0, 1.0),
+                cutouts = emptyList(),
+                materialId = DefaultMaterialCatalog.porcelainTile300x600Straight.id
+            )
+        )
+
+        val failure = runCatching {
+            fixtures.projectRepository.updateSurfaceSettings(
+                surfaceId = surfaceId,
+                materialId = DefaultMaterialCatalog.porcelainTile300x600Straight.id,
+                wastePresetOverride = "NOT_A_PRESET",
+                customWasteFactorOverride = null,
+                laborRateOverride = null
+            )
+        }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertNull(fixtures.surfaceDao.currentSurfaces.single().surface.wastePresetOverride)
+    }
+
+    @Test
+    fun `corrupt stored cutout kind degrades to a load error instead of crashing the flow`() =
+        runTest {
+            val fixtures = RepositoryFixtures()
+            val projectId = fixtures.projectRepository.ensureDefaultProject()
+            val surfaceId = fixtures.projectRepository.addSurface(
+                projectId = projectId,
+                draft = SurfaceMeasurementDraft(
+                    name = "Opening wall",
+                    outerVertices = RECTANGLE_6_SQ_METERS,
+                    referenceNormal = Vec3(0.0, 0.0, 1.0),
+                    cutouts = listOf(DOOR_CUTOUT),
+                    materialId = DefaultMaterialCatalog.porcelainTile300x600Straight.id
+                )
+            )
+            fixtures.surfaceDao.corruptCutoutKind(surfaceId, "SKYLIGHT_FROM_THE_FUTURE")
+
+            val workspace = fixtures.projectRepository.observeWorkspace(projectId)
+                .filterNotNull()
+                .first()
+
+            val surface = workspace.surfaces.single()
+            assertTrue(surface.cutouts.isEmpty())
+            assertEquals(6.0, surface.analysis?.netAreaSqMeters ?: -1.0, 1e-6)
+            assertTrue(
+                workspace.loadErrors.any { it.contains("corrupt opening record") }
+            )
+        }
+
     private class RepositoryFixtures {
         val projectDao = FakeProjectDao()
         val surfaceDao = FakeSurfaceDao()

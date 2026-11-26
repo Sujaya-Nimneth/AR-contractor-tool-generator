@@ -1,6 +1,6 @@
 # AR Contractor Quote & Material Estimation App — Master Engineering Plan
 
-> **Architecture Status:** **Phase 9 Complete & Verified** (`:core-domain:test` 40/40, `:app:testDebugUnitTest` 79/79, `:app:lintDebug`, `:app:assembleDebug`, `:app:assembleRelease`, `:app:compileDebugAndroidTestKotlin` green) — **Polish & Hardening Complete** (see `IMPROVEMENT_PLAN.md`)
+> **Architecture Status:** **Phase 10 Complete & Verified** (`:core-domain:test` 40/40, `:app:testDebugUnitTest` 91/91, `:app:lintDebug`, `:app:assembleDebug`, `:app:assembleRelease`, `:app:compileDebugAndroidTestKotlin` green) — **Critical correctness, AR lifecycle & R8 fixes landed**
 > **Target Platform:** Native Android (Min SDK 26 / Target SDK 35 / Compile SDK 36, Kotlin 2.2.0, Jetpack Compose Material 3)  
 > **Offline Guarantee:** 100% On-Device Spatial Math, Room Persistence, and Vector `PdfDocument` Generation (Zero Cloud Dependencies)
 
@@ -189,6 +189,19 @@ As Principal Spatial Computing Architects, we have incorporated **9 production-h
 - [x] Test gaps closed: `MeasurementStateCodec` round-trips + corrupt payloads, tax allocation edges (empty/single/tied-remainder/0%/100%)
 - [x] Repo hygiene verified: no tracked `.DS_Store`/`local.properties`; LICENSE still pending owner decision
 - [ ] Post-save vertex nudging in the quote workspace (deferred; manual re-entry + AR re-measure cover corrections today)
+
+---
+
+### Phase 10: Critical Functional, AR Lifecycle & R8 Correctness *(Complete & Verified)*
+- [x] `saveMeasurement()` writes into the active project (`projectId ?: ensureDefaultProject()`); project #2 AR/manual saves and in-place replacement work
+- [x] Project create confirmation preserved through `bootstrap()`; deleting the active project switches observers before deletion (no transient "project could not be found")
+- [x] Surface waste preset overrides beat a catalog material's `CUSTOM` waste factor in both `applyOverrides()` and `applyOverridesSafely()`
+- [x] Corrupt `CutoutEntity.kind` rows degrade to per-surface `loadErrors`; `updateSurfaceSettings()` validates the preset name
+- [x] Thread-safe money formatting (per-thread `NumberFormat` cache); `Uri.encode()` on the `surfaceId` route arg; guarded PDF share intent
+- [x] Runtime CAMERA permission flow (grant / permanently-denied → settings), ARScene gated on `hasCameraPermission && READY && no error`, bounded readiness polling for `UNKNOWN_CHECKING`, `ON_RESUME` recovery that clears resolved blocks and restarts the session, `renderer.clear(nodes)` on restart
+- [x] `ReticleHitTester.validateAgainstLock()` compares the real hit normal (plane hits can no longer self-validate)
+- [x] R8 keep rules for every name-persisted enum and serialization DTO; verified in `mapping.txt` (`CutoutKind.DOOR` unrenamed)
+- [x] Regression tests: `:core-domain:test` 40/40, `:app:testDebugUnitTest` 91/91 (12 new), `:app:lintDebug` clean, `:app:assembleRelease` green
 
 ---
 

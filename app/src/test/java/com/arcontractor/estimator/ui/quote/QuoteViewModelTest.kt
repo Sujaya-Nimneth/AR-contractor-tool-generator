@@ -488,12 +488,119 @@ class QuoteViewModelTest {
         assertEquals("8' 0\"", formatLength(2.4384, DisplayUnitSystem.IMPERIAL))
     }
 
+    @Test
+    fun `saving a measurement targets the active project instead of the default project`() =
+        runTest {
+            val viewModel = createViewModel()
+            val defaultProjectId = viewModel.uiState.value.projectId ?: error("Missing project")
+            viewModel.onAction(QuoteAction.UpdateNewProjectName("Second site"))
+            viewModel.onAction(QuoteAction.CreateProject)
+            val secondProjectId = viewModel.uiState.value.projectId ?: error("Missing project")
+            assertTrue(secondProjectId != defaultProjectId)
+
+            viewModel.onAction(
+                QuoteAction.SaveMeasurement(
+                    MeasurementCapture(
+                        outerVertices = RECTANGLE,
+                        referenceNormal = Vec3(0.0, 0.0, 1.0),
+                        cutouts = emptyList(),
+                        name = "Second site wall"
+                    )
+                )
+            )
+
+            val state = viewModel.uiState.value
+            assertEquals(1, state.workspace?.surfaces?.size)
+            assertEquals("Second site wall", state.workspace?.surfaces?.single()?.surfaceName)
+            assertFalse(state.message?.isError == true)
+
+            viewModel.onAction(QuoteAction.SwitchProject(defaultProjectId))
+            assertTrue(viewModel.uiState.value.workspace?.surfaces.isNullOrEmpty())
+        }
+
+    @Test
+    fun `replacing a measurement in a non-default project keeps that project selected`() =
+        runTest {
+            val viewModel = createViewModel()
+            viewModel.onAction(QuoteAction.UpdateNewProjectName("Second site"))
+            viewModel.onAction(QuoteAction.CreateProject)
+            val secondProjectId = viewModel.uiState.value.projectId ?: error("Missing project")
+            viewModel.onAction(
+                QuoteAction.SaveMeasurement(
+                    MeasurementCapture(
+                        outerVertices = RECTANGLE,
+                        referenceNormal = Vec3(0.0, 0.0, 1.0),
+                        cutouts = emptyList(),
+                        name = "Second site wall"
+                    )
+                )
+            )
+            val surfaceId = viewModel.uiState.value.selectedSurfaceId
+                ?: error("Missing surface")
+
+            viewModel.onAction(
+                QuoteAction.SaveMeasurement(
+                    MeasurementCapture(
+                        outerVertices = listOf(
+                            Vec3(0.0, 0.0, 0.0),
+                            Vec3(4.0, 0.0, 0.0),
+                            Vec3(4.0, 3.0, 0.0),
+                            Vec3(0.0, 3.0, 0.0)
+                        ),
+                        referenceNormal = Vec3(0.0, 0.0, 1.0),
+                        cutouts = emptyList(),
+                        replaceSurfaceId = surfaceId
+                    )
+                )
+            )
+
+            val state = viewModel.uiState.value
+            assertFalse(state.message?.isError == true)
+            assertEquals(secondProjectId, state.projectId)
+            assertEquals(1, state.workspace?.surfaces?.size)
+            assertEquals(
+                12.0,
+                state.workspace?.surfaces?.single()?.analysis?.netAreaSqMeters ?: -1.0,
+                1e-6
+            )
+        }
+
+    @Test
+    fun `creating a project keeps its confirmation message`() = runTest {
+        val viewModel = createViewModel()
+
+        viewModel.onAction(QuoteAction.UpdateNewProjectName("Harbor Street job"))
+        viewModel.onAction(QuoteAction.CreateProject)
+
+        val state = viewModel.uiState.value
+        assertEquals("Harbor Street job created.", state.message?.text)
+        assertFalse(state.message?.isError == true)
+        assertFalse(state.isLoading)
+    }
+
+    @Test
+    fun `deleting the active project reports success without a transient lookup error`() =
+        runTest {
+            val viewModel = createViewModel()
+            viewModel.onAction(QuoteAction.UpdateNewProjectName("Second job"))
+            viewModel.onAction(QuoteAction.CreateProject)
+            val secondProjectId = viewModel.uiState.value.projectId ?: error("Missing project")
+
+            viewModel.onAction(QuoteAction.DeleteProject(secondProjectId))
+
+            val state = viewModel.uiState.value
+            assertEquals("Project deleted.", state.message?.text)
+            assertFalse(state.message?.isError == true)
+            assertTrue(state.workspace?.project?.id != secondProjectId)
+        }
+
     private fun createViewModel(
         exporter: QuotePdfExporter = RecordingQuotePdfExporter()
     ): QuoteViewModel {
         val projectDao = FakeProjectDao()
         val surfaceDao = FakeSurfaceDao()
         val materialDao = FakeMaterialCatalogDao()
+        var surfaceSequence = 0
         val materialRepository = RoomMaterialCatalogRepository(
             materialDao = materialDao,
             surfaceDao = surfaceDao,
@@ -504,7 +611,7 @@ class QuoteViewModelTest {
             surfaceDao = surfaceDao,
             materialDao = materialDao,
             now = { 2000L },
-            idGenerator = { "surface-1" }
+            idGenerator = { "surface-${++surfaceSequence}" }
         )
         return ViewModelProvider(
             viewModelStore,

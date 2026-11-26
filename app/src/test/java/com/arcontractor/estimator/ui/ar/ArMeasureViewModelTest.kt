@@ -179,6 +179,65 @@ class ArMeasureViewModelTest {
     }
 
     @Test
+    fun `retry restarts the session after a camera permission error is resolved`() {
+        val viewModel = ArMeasureViewModel()
+        viewModel.onAction(
+            ArMeasureAction.SessionIssue(
+                message = "Camera permission is required for AR measurement.",
+                recoveryAction = ArRecoveryAction.OPEN_CAMERA_SETTINGS,
+                canRetrySession = false
+            )
+        )
+
+        viewModel.onAction(ArMeasureAction.RetrySession)
+
+        val retrying = viewModel.uiState.value
+        assertNull(retrying.sessionErrorMessage)
+        assertTrue(retrying.isSessionRestartRequested)
+    }
+
+    @Test
+    fun `environment recheck clears a resolved permission block and requests a restart`() {
+        val viewModel = ArMeasureViewModel()
+        viewModel.onAction(
+            ArMeasureAction.SessionIssue(
+                message = "Camera permission is required for AR measurement.",
+                recoveryAction = ArRecoveryAction.OPEN_CAMERA_SETTINGS,
+                canRetrySession = false
+            )
+        )
+
+        viewModel.onEnvironmentRechecked(canStartAr = true)
+
+        val recovered = viewModel.uiState.value
+        assertNull(recovered.sessionErrorMessage)
+        assertNull(recovered.sessionRecoveryAction)
+        assertTrue(recovered.isSessionRestartRequested)
+        assertTrue(recovered.isTracking)
+    }
+
+    @Test
+    fun `environment recheck keeps the blocking error when AR still cannot start`() {
+        val viewModel = ArMeasureViewModel()
+        viewModel.onAction(
+            ArMeasureAction.SessionIssue(
+                message = "Camera permission is required for AR measurement.",
+                recoveryAction = ArRecoveryAction.OPEN_CAMERA_SETTINGS,
+                canRetrySession = false
+            )
+        )
+
+        viewModel.onEnvironmentRechecked(canStartAr = false)
+
+        val blocked = viewModel.uiState.value
+        assertEquals(
+            "Camera permission is required for AR measurement.",
+            blocked.sessionErrorMessage
+        )
+        assertFalse(blocked.isSessionRestartRequested)
+    }
+
+    @Test
     fun `reset clears terminal session state`() {
         val viewModel = ArMeasureViewModel()
         viewModel.onAction(
