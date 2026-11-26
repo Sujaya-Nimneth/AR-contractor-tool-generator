@@ -31,6 +31,35 @@ jobs:
       - name: Domain tests, app unit tests, lint, and debug APK
         run: ./gradlew :core-domain:test :app:testDebugUnitTest :app:lintDebug :app:assembleDebug --console=plain
 
+      - name: Release R8 and resource shrinking check
+        run: ./gradlew :app:assembleRelease --console=plain
+
+      - name: Assert persisted names survived R8
+        run: |
+          set -euo pipefail
+          MAPPING="app/build/outputs/mapping/release/mapping.txt"
+          for entry in \
+            "com.arcontractor.estimator.ui.ar.ArMeasurePhase" \
+            "com.arcontractor.estimator.domain.geometry.CutoutKind" \
+            "com.arcontractor.estimator.domain.estimation.WastePreset" \
+            "com.arcontractor.estimator.domain.estimation.TaxPolicy"; do
+            if ! grep -q "^$entry -> $entry:" "$MAPPING"; then
+              echo "::error::$entry was obfuscated; saved quotes would not deserialize."
+              exit 1
+            fi
+          done
+          for constant in \
+            "CutoutKind DOOR -> DOOR" \
+            "CutoutKind WINDOW -> WINDOW" \
+            "WastePreset CUSTOM -> CUSTOM" \
+            "WastePreset STRAIGHT_LAY -> STRAIGHT_LAY" \
+            "TaxPolicy TAX_TOTAL_SUBTOTAL -> TAX_TOTAL_SUBTOTAL"; do
+            if ! grep -q "$constant" "$MAPPING"; then
+              echo "::error::Enum constant '$constant' was renamed by R8."
+              exit 1
+            fi
+          done
+
       - name: Upload test reports on failure
         if: failure()
         uses: actions/upload-artifact@v4
