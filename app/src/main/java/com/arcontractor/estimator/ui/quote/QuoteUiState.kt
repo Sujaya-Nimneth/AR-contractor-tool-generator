@@ -68,6 +68,20 @@ data class QuoteMessage(
     val isError: Boolean = false
 )
 
+/**
+ * In-app update banner state. Purely advisory: the quote workspace is fully usable without it.
+ */
+data class UpdateUiState(
+    val availableVersionName: String? = null,
+    val availableVersionCode: Int? = null,
+    val isChecking: Boolean = false,
+    val isDownloading: Boolean = false,
+    val isDismissed: Boolean = false
+) {
+    val hasUpdate: Boolean
+        get() = availableVersionCode != null && !isDismissed
+}
+
 data class CatalogEditorDraft(
     val id: String,
     val name: String,
@@ -123,7 +137,8 @@ data class QuoteUiState(
     val isExportDialogOpen: Boolean = false,
     val exportDraft: QuoteExportDraft = QuoteExportDraft(),
     val exportedPdf: PdfExportResult? = null,
-    val message: QuoteMessage? = null
+    val message: QuoteMessage? = null,
+    val update: UpdateUiState = UpdateUiState()
 ) {
     val selectedSurface: SurfaceQuoteLine?
         get() = workspace?.surfaces?.firstOrNull { it.surfaceId == selectedSurfaceId }
@@ -173,4 +188,7 @@ sealed interface QuoteAction {
     data object SaveCatalogMaterial : QuoteAction
     data object DeleteCatalogMaterial : QuoteAction
     data object DismissMessage : QuoteAction
+    data object CheckForUpdates : QuoteAction
+    data object DownloadUpdate : QuoteAction
+    data object DismissUpdate : QuoteAction
 }
