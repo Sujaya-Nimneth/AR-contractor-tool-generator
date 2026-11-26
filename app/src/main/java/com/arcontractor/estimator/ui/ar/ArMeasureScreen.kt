@@ -1,5 +1,11 @@
 package com.arcontractor.estimator.ui.ar
 
+import android.Manifest
+import android.app.Activity
+import android.content.Context
+import android.content.ContextWrapper
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -32,6 +38,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.foundation.layout.Spacer
+import androidx.core.app.ActivityCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -44,6 +51,7 @@ import com.arcontractor.estimator.spatial.tracking.ReticleHitTester
 import com.arcontractor.estimator.spatial.tracking.SurfaceRenderSnapshot
 import com.arcontractor.estimator.spatial.tracking.checkArReadiness
 import com.arcontractor.estimator.spatial.tracking.guidance
+import com.arcontractor.estimator.spatial.tracking.hasCameraPermission
 import com.arcontractor.estimator.spatial.tracking.intent
 import com.arcontractor.estimator.spatial.tracking.recoveryAction
 import com.arcontractor.estimator.spatial.tracking.resolveArReadiness
@@ -85,6 +93,8 @@ fun ArMeasureScreen(
     val sessionController = remember { ArSessionController() }
     var arSceneView by remember { mutableStateOf<ARSceneView?>(null) }
     var sessionGeneration by remember { mutableIntStateOf(0) }
+    var hasCameraPermission by remember { mutableStateOf(context.hasCameraPermission()) }
+    var permissionPermanentlyDenied by remember { mutableStateOf(false) }
     var readinessGuidance by remember {
         mutableStateOf(context.checkArReadiness().guidance())
     }
@@ -94,10 +104,32 @@ fun ArMeasureScreen(
             lifecycleOwner.lifecycle.currentState.isAtLeast(Lifecycle.State.RESUMED)
         )
     }
+    val cameraPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        hasCameraPermission = granted
+        permissionPermanentlyDenied = !granted && context.findActivity()?.let { activity ->
+            !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.CAMERA)
+        } == true
+        if (granted) {
+            viewModel.onAction(ArMeasureAction.ClearMessage)
+            viewModel.onEnvironmentRechecked(canStartAr = true)
+        }
+    }
 
     DisposableEffect(lifecycleOwner, viewModel) {
         val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
             isResumed = event == Lifecycle.Event.ON_RESUME
+            if (event == Lifecycle.Event.ON_RESUME) {
+                // Returning from Android settings or the Play Store must clear a resolved block.
+                val granted = context.hasCameraPermission()
+                hasCameraPermission = granted
+                val guidance = context.checkArReadiness().guidance()
+                readinessGuidance = guidance
+                viewModel.onEnvironmentRechecked(
+                    canStartAr = granted && guidance.readiness == ArReadiness.READY
+                )
+            }
             if (event == Lifecycle.Event.ON_STOP) {
                 viewModel.persistMeasurementState()
             }
@@ -107,21 +139,36 @@ fun ArMeasureScreen(
     }
     LaunchedEffect(Unit) {
         readinessGuidance = context.resolveArReadiness()
+        if (!hasCameraPermission && !permissionPermanentlyDenied) {
+            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+        }
     }
     LaunchedEffect(isResumed, state.isSessionRestartRequested) {
         if (isResumed) {
             readinessGuidance = context.checkArReadiness().guidance()
         }
         if (state.isSessionRestartRequested) {
+            renderer.clear(nodes)
+            hitTester.setSurfaceLock(null, null)
             sessionGeneration += 1
             viewModel.onAction(ArMeasureAction.SessionRestartHandled)
         }
     }
-    val canMountArScene = readinessGuidance.readiness != ArReadiness.UNSUPPORTED_DEVICE &&
-        readinessGuidance.readiness != ArReadiness.INSTALLATION_UNAVAILABLE &&
+    // ARCore reports UNKNOWN_CHECKING on a cold start; poll briefly until the answer settles.
+    LaunchedEffect(readinessGuidance.readiness) {
+        if (readinessGuidance.readiness != ArReadiness.TEMPORARILY_UNAVAILABLE) return@LaunchedEffect
+        repeat(READINESS_POLL_ATTEMPTS) {
+            delay(READINESS_POLL_INTERVAL_MS)
+            val next = context.checkArReadiness().guidance()
+            readinessGuidance = next
+            if (next.readiness != ArReadiness.TEMPORARILY_UNAVAILABLE) return@LaunchedEffect
+        }
+    }
+    val canMountArScene = hasCameraPermission &&
+        readinessGuidance.readiness == ArReadiness.READY &&
         state.sessionErrorMessage == null
     val readiness = readinessGuidance.readiness
-    val isArReady = readiness == ArReadiness.READY
+    val isArReady = readiness == ArReadiness.READY && hasCameraPermission
 
     val renderSnapshot = remember(
         state.outerVertices,
@@ -279,24 +326,48 @@ fun ArMeasureScreen(
         }
 
         if (!isArReady || state.sessionErrorMessage != null) {
+            val needsPermission = !hasCameraPermission
             ArRecoveryCard(
-                title = if (!isArReady) "AR not ready" else "AR session needs attention",
-                message = if (!isArReady) readinessGuidance.message else state.sessionErrorMessage.orEmpty(),
-                recoveryAction = if (!isArReady) {
-                    readinessGuidance.recoveryAction
-                } else {
-                    state.sessionRecoveryAction ?: ArRecoveryAction.RETRY
+                title = when {
+                    needsPermission -> "Camera permission needed"
+                    !isArReady -> "AR not ready"
+                    else -> "AR session needs attention"
                 },
-                canRetrySession = if (!isArReady) {
-                    readinessGuidance.recoveryAction == ArRecoveryAction.RETRY
-                } else {
-                    state.canRetrySession
-                },
-                onRetrySession = {
-                    if (!isArReady) {
-                        readinessGuidance = context.resolveArReadiness(requestInstall = true)
+                message = when {
+                    needsPermission -> if (permissionPermanentlyDenied) {
+                        "Camera access is blocked. Open Android settings, allow Camera, then return here."
+                    } else {
+                        "AR measurement needs the camera. Grant access to start measuring."
                     }
-                    viewModel.onAction(ArMeasureAction.RetrySession)
+
+                    !isArReady -> readinessGuidance.message
+                    else -> state.sessionErrorMessage.orEmpty()
+                },
+                recoveryAction = when {
+                    needsPermission && permissionPermanentlyDenied -> ArRecoveryAction.OPEN_CAMERA_SETTINGS
+                    !isArReady -> readinessGuidance.recoveryAction
+                    else -> state.sessionRecoveryAction ?: ArRecoveryAction.RETRY
+                },
+                canRetrySession = when {
+                    needsPermission -> !permissionPermanentlyDenied
+                    !isArReady -> readinessGuidance.recoveryAction == ArRecoveryAction.RETRY
+                    else -> state.canRetrySession
+                },
+                retryLabel = if (needsPermission) "GRANT CAMERA ACCESS" else "RETRY AR SESSION",
+                onRetrySession = {
+                    if (needsPermission) {
+                        if (permissionPermanentlyDenied) {
+                            ArRecoveryAction.OPEN_CAMERA_SETTINGS.intent(context)
+                                ?.let(context::startActivity)
+                        } else {
+                            cameraPermissionLauncher.launch(Manifest.permission.CAMERA)
+                        }
+                    } else {
+                        if (!isArReady) {
+                            readinessGuidance = context.resolveArReadiness(requestInstall = true)
+                        }
+                        viewModel.onAction(ArMeasureAction.RetrySession)
+                    }
                 },
                 onBackToQuote = onBackToQuote,
                 openSettings = { action ->
@@ -354,6 +425,7 @@ private fun ArRecoveryCard(
     message: String,
     recoveryAction: ArRecoveryAction,
     canRetrySession: Boolean,
+    retryLabel: String,
     onRetrySession: () -> Unit,
     onBackToQuote: () -> Unit,
     openSettings: (ArRecoveryAction) -> Unit,
@@ -384,7 +456,7 @@ private fun ArRecoveryCard(
                     onClick = onRetrySession,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("RETRY AR SESSION")
+                    Text(retryLabel)
                 }
                 Spacer(Modifier.height(8.dp))
             }
@@ -439,4 +511,17 @@ private fun TrackingFailureReason.userMessage(): String = when (this) {
 
     TrackingFailureReason.CAMERA_UNAVAILABLE ->
         "The rear camera is unavailable. Close other camera apps and try again."
+}
+
+private const val READINESS_POLL_INTERVAL_MS = 250L
+private const val READINESS_POLL_ATTEMPTS = 10
+
+/** Unwraps the hosting [Activity] from a possibly themed Compose context. */
+internal fun Context.findActivity(): Activity? {
+    var current: Context? = this
+    while (current is ContextWrapper) {
+        if (current is Activity) return current
+        current = current.baseContext
+    }
+    return current as? Activity
 }
