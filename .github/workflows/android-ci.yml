@@ -48,13 +48,13 @@ jobs:
               exit 1
             fi
           done
-          for constant in \
-            "CutoutKind DOOR -> DOOR" \
-            "CutoutKind WINDOW -> WINDOW" \
-            "WastePreset CUSTOM -> CUSTOM" \
-            "WastePreset STRAIGHT_LAY -> STRAIGHT_LAY" \
-            "TaxPolicy TAX_TOTAL_SUBTOTAL -> TAX_TOTAL_SUBTOTAL"; do
-            if ! grep -q "$constant" "$MAPPING"; then
+
+          # Enum constants are persisted by name, so they must survive in the shipped DEX.
+          APK="$(ls app/build/outputs/apk/release/*.apk | head -n 1)"
+          DEX_DUMP="$RUNNER_TEMP/app.dex.bin"
+          unzip -p "$APK" 'classes*.dex' > "$DEX_DUMP"
+          for constant in DOOR WINDOW CUSTOM STRAIGHT_LAY TAX_TOTAL_SUBTOTAL LOCKING_PLANE; do
+            if ! grep -qa "$constant" "$DEX_DUMP"; then
               echo "::error::Enum constant '$constant' was renamed by R8."
               exit 1
             fi

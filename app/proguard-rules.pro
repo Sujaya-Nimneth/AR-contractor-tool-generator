@@ -6,7 +6,16 @@
 # names that are persisted *by name* (Room columns, SavedStateHandle JSON) and therefore must
 # never be obfuscated, otherwise saved quotes stop deserializing after an app update.
 
-# Enums persisted through Enum.name / Enum.valueOf(...)
+# Enums persisted through Enum.name / Enum.valueOf(...). Both the class name and the
+# constants must survive so a value written by build N still parses in build N+1.
+-keepnames enum com.arcontractor.estimator.domain.geometry.CutoutKind
+-keepnames enum com.arcontractor.estimator.domain.estimation.TradeType
+-keepnames enum com.arcontractor.estimator.domain.estimation.PackageUnitType
+-keepnames enum com.arcontractor.estimator.domain.estimation.PricingAreaUnit
+-keepnames enum com.arcontractor.estimator.domain.estimation.WastePreset
+-keepnames enum com.arcontractor.estimator.domain.estimation.TaxPolicy
+-keepnames enum com.arcontractor.estimator.ui.ar.ArMeasurePhase
+-keepnames enum com.arcontractor.estimator.spatial.tracking.ArRecoveryAction
 -keepclassmembers enum com.arcontractor.estimator.domain.geometry.CutoutKind { *; }
 -keepclassmembers enum com.arcontractor.estimator.domain.estimation.TradeType { *; }
 -keepclassmembers enum com.arcontractor.estimator.domain.estimation.PackageUnitType { *; }
@@ -29,3 +38,8 @@
     <fields>;
     <init>(...);
 }
+
+# In-app update manifest DTOs parsed with kotlinx.serialization
+-keep class com.arcontractor.estimator.data.update.ReleaseManifest { *; }
+-keep class com.arcontractor.estimator.data.update.UpdateVariant { *; }
+-keep class com.arcontractor.estimator.data.update.GitHubUpdateChecker { *; }
