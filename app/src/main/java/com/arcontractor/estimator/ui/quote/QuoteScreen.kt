@@ -8,6 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
@@ -56,6 +58,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.arcontractor.estimator.BuildConfig
 import com.arcontractor.estimator.data.repository.ProjectWorkspace
 import com.arcontractor.estimator.data.repository.SurfaceQuoteLine
 import com.arcontractor.estimator.data.pdf.PdfExportResult
@@ -161,6 +164,7 @@ private fun QuoteLoading() {
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun QuoteWorkspace(
     state: QuoteUiState,
@@ -238,7 +242,10 @@ private fun QuoteWorkspace(
                             title = "No surfaces measured yet",
                             body = "Walk the room once and save the first wall or floor, or type its dimensions manually. Material, waste, and labor stay editable here.",
                             action = {
-                                Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                                FlowRow(
+                                    horizontalArrangement = Arrangement.spacedBy(10.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
                                     Button(
                                         onClick = onMeasureSurface,
                                         shape = RoundedCornerShape(6.dp),
@@ -350,17 +357,26 @@ private fun QuoteWorkspace(
             }
 
             item {
-                Text(
-                    text = "Calculated on this device from measured anchors. No cloud account required.",
-                    modifier = Modifier.padding(top = 24.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
+                Column {
+                    Text(
+                        text = "Calculated on this device from measured anchors. No cloud account required.",
+                        modifier = Modifier.padding(top = 24.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Text(
+                        text = "v${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                        modifier = Modifier.padding(top = 2.dp),
+                        style = MaterialTheme.typography.labelSmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.72f)
+                    )
+                }
             }
         }
     }
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun QuoteHeader(
     projectName: String,
@@ -370,46 +386,45 @@ private fun QuoteHeader(
     onOpenProjects: () -> Unit
 ) {
     Column {
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            SiteMark(modifier = Modifier.size(34.dp))
-            Column(
-                modifier = Modifier
-                    .weight(1f)
-                    .padding(start = 11.dp)
-                    .clickable(onClick = onOpenProjects)
-            ) {
-                Text(
-                    text = "SITE LEDGER",
-                    color = MaterialTheme.colorScheme.onBackground,
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    letterSpacing = 1.5.sp
-                )
-                Text(
-                    text = "$projectName ▾",
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    style = MaterialTheme.typography.bodySmall,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis
-                )
-            }
-            TextButton(onClick = onOpenCatalog) {
-                Text("Catalog")
-            }
-            TextButton(onClick = onManualEntry) {
-                Text("Manual")
-            }
-            Button(
-                onClick = onMeasureSurface,
-                shape = RoundedCornerShape(6.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.primary
-                )
-            ) {
-                Text("Measure")
+        BoxWithConstraints(modifier = Modifier.fillMaxWidth()) {
+            val compact = maxWidth < COMPACT_HEADER_WIDTH
+            if (compact) {
+                Column {
+                    HeaderIdentity(
+                        projectName = projectName,
+                        onOpenProjects = onOpenProjects,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                    FlowRow(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 10.dp),
+                        horizontalArrangement = Arrangement.spacedBy(4.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        HeaderActions(
+                            onOpenCatalog = onOpenCatalog,
+                            onManualEntry = onManualEntry,
+                            onMeasureSurface = onMeasureSurface
+                        )
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    HeaderIdentity(
+                        projectName = projectName,
+                        onOpenProjects = onOpenProjects,
+                        modifier = Modifier.weight(1f)
+                    )
+                    HeaderActions(
+                        onOpenCatalog = onOpenCatalog,
+                        onManualEntry = onManualEntry,
+                        onMeasureSurface = onMeasureSurface
+                    )
+                }
             }
         }
         HorizontalDivider(
@@ -419,6 +434,62 @@ private fun QuoteHeader(
     }
 }
 
+@Composable
+private fun HeaderIdentity(
+    projectName: String,
+    onOpenProjects: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
+        SiteMark(modifier = Modifier.size(34.dp))
+        Column(
+            modifier = Modifier
+                .weight(1f)
+                .padding(start = 11.dp)
+                .clickable(onClick = onOpenProjects)
+        ) {
+            Text(
+                text = "SITE LEDGER",
+                color = MaterialTheme.colorScheme.onBackground,
+                fontSize = 11.sp,
+                fontWeight = FontWeight.Bold,
+                letterSpacing = 1.5.sp
+            )
+            Text(
+                text = "$projectName ▾",
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.bodySmall,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun HeaderActions(
+    onOpenCatalog: () -> Unit,
+    onManualEntry: () -> Unit,
+    onMeasureSurface: () -> Unit
+) {
+    TextButton(onClick = onOpenCatalog) {
+        Text("Catalog")
+    }
+    TextButton(onClick = onManualEntry) {
+        Text("Manual")
+    }
+    Button(
+        onClick = onMeasureSurface,
+        shape = RoundedCornerShape(6.dp),
+        colors = ButtonDefaults.buttonColors(
+            containerColor = MaterialTheme.colorScheme.primary
+        )
+    ) {
+        Text("Measure")
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun QuoteTitleRow(
     workspace: ProjectWorkspace?,
@@ -452,22 +523,27 @@ private fun QuoteTitleRow(
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            FilterChip(
-                selected = displayUnits == DisplayUnitSystem.METRIC,
-                onClick = { onSetDisplayUnits(DisplayUnitSystem.METRIC) },
-                label = { Text("m²") },
-                shape = RoundedCornerShape(5.dp)
-            )
-            FilterChip(
-                selected = displayUnits == DisplayUnitSystem.IMPERIAL,
-                onClick = { onSetDisplayUnits(DisplayUnitSystem.IMPERIAL) },
-                label = { Text("ft²") },
-                shape = RoundedCornerShape(5.dp)
-            )
-        }
+    }
+    FlowRow(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(6.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        FilterChip(
+            selected = displayUnits == DisplayUnitSystem.METRIC,
+            onClick = { onSetDisplayUnits(DisplayUnitSystem.METRIC) },
+            label = { Text("m²") },
+            shape = RoundedCornerShape(5.dp)
+        )
+        FilterChip(
+            selected = displayUnits == DisplayUnitSystem.IMPERIAL,
+            onClick = { onSetDisplayUnits(DisplayUnitSystem.IMPERIAL) },
+            label = { Text("ft²") },
+            shape = RoundedCornerShape(5.dp)
+        )
         if (workspace != null && surfaceCount == 0) {
-            Spacer(Modifier.width(10.dp))
             Button(
                 onClick = onMeasureSurface,
                 shape = RoundedCornerShape(6.dp),
@@ -1078,3 +1154,6 @@ fun TradeType.shortName(): String = when (this) {
     TradeType.PAINTING -> "Paint"
     TradeType.DRYWALL -> "Drywall"
 }
+
+/** Below this width the header stacks its actions onto a second row. */
+private val COMPACT_HEADER_WIDTH = 520.dp
